@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://lims.com/processes"
+             id="Definitions_SamplingProcess">
+
+    <process id="sampling-process" name="阶段三：采样管理流程" isExecutable="true">
+        <startEvent id="startEvent_sampling" name="接收采样任务" />
+
+        <!-- 1. 采样主任准备任务 -->
+        <userTask id="task_sampling_plan" name="采样方案编制与准备"
+                  flowable:candidateGroups="SAMPLING_DIRECTOR"
+                  flowable:category="SAMPLING">
+            <documentation>采样主任规划采样点位、检测指标及人员排班</documentation>
+        </userTask>
+
+        <!-- 2. 采样队长物料与设备准备 -->
+        <userTask id="task_material_prepare" name="耗材与仪器设备准备"
+                  flowable:candidateGroups="SAMPLING_CAPTAIN"
+                  flowable:category="SAMPLING">
+            <documentation>采样队长领用耗材试剂瓶、校准采样便携式仪器</documentation>
+        </userTask>
+
+        <!-- 3. 现场确认与采样执行 (嵌入子流程或串行任务) -->
+        <userTask id="task_field_collect" name="现场核实与采样实施"
+                  flowable:candidateGroups="SAMPLING_OFFICER"
+                  flowable:category="SAMPLING">
+            <documentation>现场记录环境参数，布点采集样品，并填报采样单</documentation>
+        </userTask>
+
+        <!-- 4. 采样记录审核 -->
+        <userTask id="task_sampling_audit" name="采样记录与样品核查"
+                  flowable:candidateGroups="SAMPLING_AUDITOR"
+                  flowable:category="SAMPLING">
+            <documentation>采样审核员核查样品封签完整性、采样单逻辑完整度</documentation>
+        </userTask>
+
+        <!-- 审核结果网关 -->
+        <exclusiveGateway id="gateway_sampling_audit" name="采样审核结果" />
+
+        <!-- 驳回重采任务 -->
+        <userTask id="task_resampling" name="现场重新采样处理"
+                  flowable:candidateGroups="SAMPLING_OFFICER"
+                  flowable:category="SAMPLING">
+            <documentation>被审核员驳回后，现场团队重新前往点位采样补正</documentation>
+        </userTask>
+
+        <endEvent id="endEvent_sampling_success" name="采样审核完成流转入库" />
+
+        <!-- 连线定义 -->
+        <sequenceFlow id="flow_s1" sourceRef="startEvent_sampling" targetRef="task_sampling_plan" />
+        <sequenceFlow id="flow_s2" sourceRef="task_sampling_plan" targetRef="task_material_prepare" />
+        <sequenceFlow id="flow_s3" sourceRef="task_material_prepare" targetRef="task_field_collect" />
+        <sequenceFlow id="flow_s4" sourceRef="task_field_collect" targetRef="task_sampling_audit" />
+        <sequenceFlow id="flow_s5" sourceRef="task_sampling_audit" targetRef="gateway_sampling_audit" />
+
+        <!-- 审核通过 -->
+        <sequenceFlow id="flow_s_pass" name="采样审核通过" sourceRef="gateway_sampling_audit" targetRef="endEvent_sampling_success">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${auditPass == true}]]></conditionExpression>
+        </sequenceFlow>
+
+        <!-- 审核驳回至重新采样 -->
+        <sequenceFlow id="flow_s_reject" name="驳回重采" sourceRef="gateway_sampling_audit" targetRef="task_resampling">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${auditPass == false}]]></conditionExpression>
+        </sequenceFlow>
+
+        <!-- 重新采样完成后再次送审 -->
+        <sequenceFlow id="flow_s_resubmit" name="重新送审" sourceRef="task_resampling" targetRef="task_sampling_audit" />
+    </process>
+</definitions>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://lims.com/processes"
+             id="Definitions_ReportProcess">
+
+    <process id="report-process" name="阶段五：报告编制与审核流程" isExecutable="true">
+        <startEvent id="startEvent_report" name="检测归档触发" />
+
+        <!-- 1. 报告员发起与选模板生成 -->
+        <userTask id="task_report_init" name="发起报告与选择模板"
+                  flowable:candidateGroups="REPORT_SPECIALIST"
+                  flowable:category="REPORT">
+            <documentation>报告专员根据检测类别选择对应Word/PDF标准报告模板</documentation>
+        </userTask>
+
+        <!-- 2. 分配给编制员编制 -->
+        <userTask id="task_report_edit" name="报告内容编制与校核"
+                  flowable:candidateGroups="REPORT_WRITER"
+                  flowable:category="REPORT">
+            <documentation>报告编制员完善方法依据、评价标准、图谱附件并给出综合评述</documentation>
+        </userTask>
+
+        <!-- 3. 技术审核员审核 -->
+        <userTask id="task_report_audit" name="技术审核员审核"
+                  flowable:candidateGroups="REPORT_AUDITOR"
+                  flowable:category="REPORT">
+            <documentation>技术负责人/审核员对报告内容的一致性、完整性和准确性进行签核</documentation>
+        </userTask>
+
+        <!-- 审核结果网关 -->
+        <exclusiveGateway id="gateway_tech_audit" name="技术审核决策" />
+
+        <!-- 4. 财务审核 (防未交款先放报告风险) -->
+        <userTask id="task_finance_check" name="财务账款核查"
+                  flowable:candidateGroups="FINANCE_SPECIALIST"
+                  flowable:category="REPORT">
+            <documentation>财务人员审查款项结算方式或预付款，准予签发盖章</documentation>
+        </userTask>
+
+        <exclusiveGateway id="gateway_finance_audit" name="财务审核决策" />
+
+        <!-- 5. 报告发布发放 -->
+        <userTask id="task_report_publish" name="电子印章签发与发布"
+                  flowable:candidateGroups="REPORT_SPECIALIST"
+                  flowable:category="REPORT">
+            <documentation>报告员调用数字证书完成加盖CMA/CNAS章并生成正式PDF归档发放</documentation>
+        </userTask>
+
+        <endEvent id="endEvent_report_published" name="报告正式发布归档" />
+
+        <!-- 连线定义 -->
+        <sequenceFlow id="flow_r1" sourceRef="startEvent_report" targetRef="task_report_init" />
+        <sequenceFlow id="flow_r2" sourceRef="task_report_init" targetRef="task_report_edit" />
+        <sequenceFlow id="flow_r3" sourceRef="task_report_edit" targetRef="task_report_audit" />
+        <sequenceFlow id="flow_r4" sourceRef="task_report_audit" targetRef="gateway_tech_audit" />
+
+        <!-- 技术审核分支 -->
+        <sequenceFlow id="flow_r_pass" name="技术审核合格" sourceRef="gateway_tech_audit" targetRef="task_finance_check">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${techAuditPass == true}]]></conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flow_r_reject_edit" name="技术退回编制" sourceRef="gateway_tech_audit" targetRef="task_report_edit">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${techAuditPass == false}]]></conditionExpression>
+        </sequenceFlow>
+
+        <!-- 财务审核分支 -->
+        <sequenceFlow id="flow_r5" sourceRef="task_finance_check" targetRef="gateway_finance_audit" />
+
+        <sequenceFlow id="flow_r_fin_pass" name="财务同意签发" sourceRef="gateway_finance_audit" targetRef="task_report_publish">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${financeAuditPass == true}]]></conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flow_r_fin_reject" name="财务驳回修改" sourceRef="gateway_finance_audit" targetRef="task_report_edit">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${financeAuditPass == false}]]></conditionExpression>
+        </sequenceFlow>
+
+        <!-- 发布完成 -->
+        <sequenceFlow id="flow_r6" sourceRef="task_report_publish" targetRef="endEvent_report_published" />
+    </process>
+</definitions>

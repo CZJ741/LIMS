@@ -1,0 +1,56 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    dynamic:
+      primary: master
+      strict: true
+      datasource:
+        master:
+          url: jdbc:mysql://lims-mysql-prod:3306/lims?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          username: lims_prod_user
+          password: lims_prod_secure_password
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          hikari:
+            minimum-idle: 20
+            maximum-pool-size: 50
+            idle-timeout: 30000
+            pool-name: LimsHikariCP-Prod
+            max-lifetime: 1800000
+            connection-timeout: 30000
+
+  data:
+    redis:
+      host: lims-redis-prod
+      port: 6379
+      password: lims_redis_prod_strong_pwd
+      database: 0
+      timeout: 3000ms
+
+redisson:
+  singleServerConfig:
+    address: "redis://lims-redis-prod:6379"
+    password: lims_redis_prod_strong_pwd
+    database: 0
+    timeout: 3000
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.lims.**.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    call-setters-on-nulls: true
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0

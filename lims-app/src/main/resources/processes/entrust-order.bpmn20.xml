@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://lims.com/processes"
+             id="Definitions_EntrustOrder">
+
+    <process id="entrust-order" name="阶段二：委托下单流程" isExecutable="true">
+        <startEvent id="startEvent_entrust" name="合同审核通过触发" />
+
+        <!-- 委托下单任务 -->
+        <userTask id="task_create_order" name="开具委托单"
+                  flowable:candidateGroups="ORDER_SPECIALIST"
+                  flowable:category="ENTRUST">
+            <documentation>下单专员基于已审核合同建立委托单并录入检测技术指标要求</documentation>
+        </userTask>
+
+        <exclusiveGateway id="gateway_order" name="下单决策" />
+
+        <endEvent id="endEvent_ordered" name="下单成功完成" />
+        <endEvent id="endEvent_cancelled" name="委托取消关闭" />
+
+        <!-- 连线 -->
+        <sequenceFlow id="flow_e1" sourceRef="startEvent_entrust" targetRef="task_create_order" />
+        <sequenceFlow id="flow_e2" sourceRef="task_create_order" targetRef="gateway_order" />
+
+        <sequenceFlow id="flow_e_pass" name="确认下单" sourceRef="gateway_order" targetRef="endEvent_ordered">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${orderAction == 'SUBMIT'}]]></conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flow_e_cancel" name="取消委托" sourceRef="gateway_order" targetRef="endEvent_cancelled">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${orderAction == 'CANCEL'}]]></conditionExpression>
+        </sequenceFlow>
+    </process>
+</definitions>

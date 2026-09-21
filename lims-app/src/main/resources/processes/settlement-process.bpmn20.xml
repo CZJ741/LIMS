@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://lims.com/processes"
+             id="Definitions_SettlementProcess">
+
+    <process id="settlement-process" name="阶段六：财务结算流程" isExecutable="true">
+        <startEvent id="startEvent_settlement" name="报告发布结算触发" />
+
+        <!-- 1. 财务专员创建并核验结算单 -->
+        <userTask id="task_settlement_create" name="核算与开立结算单"
+                  flowable:candidateGroups="FINANCE_SPECIALIST"
+                  flowable:category="SETTLEMENT">
+            <documentation>财务人员根据委托单明细与合同单价核算开票金额与明细</documentation>
+        </userTask>
+
+        <!-- 2. 财务审核确认到账 -->
+        <userTask id="task_settlement_confirm" name="开票与到账核销"
+                  flowable:candidateGroups="FINANCE_SPECIALIST"
+                  flowable:category="SETTLEMENT">
+            <documentation>核实发票开具情况与银行到账流水，完成核销</documentation>
+        </userTask>
+
+        <!-- 审核确认网关 -->
+        <exclusiveGateway id="gateway_settlement" name="结算核销决策" />
+
+        <endEvent id="endEvent_settlement_done" name="财务结算完毕" />
+
+        <!-- 连线定义 -->
+        <sequenceFlow id="flow_set1" sourceRef="startEvent_settlement" targetRef="task_settlement_create" />
+        <sequenceFlow id="flow_set2" sourceRef="task_settlement_create" targetRef="task_settlement_confirm" />
+        <sequenceFlow id="flow_set3" sourceRef="task_settlement_confirm" targetRef="gateway_settlement" />
+
+        <sequenceFlow id="flow_set_pass" name="核销通过" sourceRef="gateway_settlement" targetRef="endEvent_settlement_done">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${settlePass == true}]]></conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flow_set_reject" name="金额异议驳回" sourceRef="gateway_settlement" targetRef="task_settlement_create">
+            <conditionExpression xsi:type="tFormalExpression"><![CDATA[${settlePass == false}]]></conditionExpression>
+        </sequenceFlow>
+    </process>
+</definitions>

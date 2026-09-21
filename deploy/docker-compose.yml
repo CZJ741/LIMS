@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  lims-mysql:
+    image: mysql:5.7.44
+    container_name: lims-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: lims
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_general_ci
+    command:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --default-time-zone='+08:00'
+      --max_connections=1000
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/conf:/etc/mysql/conf.d
+      - ../db/migration:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    networks:
+      - lims-net
+
+  lims-redis:
+    image: redis:7.2-alpine
+    container_name: lims-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}"
+    volumes:
+      - ./redis/data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - lims-net
+
+  lims-minio:
+    image: minio/minio:RELEASE.2024-09-13T20-26-02Z
+    container_name: lims-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ./minio/data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - lims-net
+
+  lims-app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: lims-app
+    restart: always
+    depends_on:
+      - lims-mysql
+      - lims-redis
+      - lims-minio
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: lims-mysql
+      DB_PORT: 3306
+      DB_NAME: lims
+      DB_USER: root
+      DB_PASS: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      REDIS_HOST: lims-redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: http://lims-minio:9000
+    ports:
+      - "8080:8080"
+    networks:
+      - lims-net
+
+  lims-nginx:
+    image: nginx:1.27-alpine
+    container_name: lims-nginx
+    restart: always
+    depends_on:
+      - lims-app
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../lims-web/dist:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - lims-net
+
+networks:
+  lims-net:
+    driver: bridge

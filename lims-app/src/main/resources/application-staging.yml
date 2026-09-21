@@ -1,0 +1,56 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+  datasource:
+    dynamic:
+      primary: master
+      strict: false
+      datasource:
+        master:
+          url: jdbc:mysql://lims-mysql:3306/lims?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          username: lims_user
+          password: lims_staging_pwd
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          hikari:
+            minimum-idle: 10
+            maximum-pool-size: 30
+            idle-timeout: 30000
+            pool-name: LimsHikariCP-Staging
+            max-lifetime: 1800000
+            connection-timeout: 30000
+
+  data:
+    redis:
+      host: lims-redis
+      port: 6379
+      password: redis_staging_pwd
+      database: 0
+      timeout: 5000ms
+
+redisson:
+  singleServerConfig:
+    address: "redis://lims-redis:6379"
+    password: redis_staging_pwd
+    database: 0
+    timeout: 3000
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.lims.**.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    call-setters-on-nulls: true
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0

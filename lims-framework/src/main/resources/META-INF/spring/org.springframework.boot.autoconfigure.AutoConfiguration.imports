@@ -1,5 +1,0 @@
-org.springframework.boot.autoconfigure.AutoConfiguration.imports=
-com.lims.framework.web.WebAutoConfiguration
-com.lims.framework.redis.RedisAutoConfiguration
-com.lims.framework.mybatis.MybatisAutoConfiguration
-com.lims.framework.security.SecurityAutoConfiguration

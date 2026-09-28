@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.lims import SysUser, LimsEntrustTask, LimsSample, LimsDetectionTask, LimsReport, LimsContract, LimsAuditTask
+from app.models.lims import SysUser, LimsEntrustTask, LimsSample, LimsDetectionTask, LimsReport, LimsContract, LimsAuditTask, LimsSamplingPreparation
 from app.schemas.lims import (
     StandardResponse, LoginRequest,
     EntrustCreate, EntrustOut,
@@ -13,7 +13,8 @@ from app.schemas.lims import (
     DetectionCreate, DetectionUpdateResult, DetectionOut,
     ReportCreate, ReportOut,
     ContractCreate, ContractOut,
-    AuditTaskCreate, AuditTaskApprove, AuditTaskOut
+    AuditTaskCreate, AuditTaskApprove, AuditTaskOut,
+    SamplingPreparationSave, SamplingPreparationOut
 )
 
 router = APIRouter()
@@ -174,7 +175,7 @@ def submit_sampling(entrust_id: int, db: Session = Depends(get_db)):
     # 如果有对应的审批任务节点，同步将委托下单推进至采样流转
     audit_task = db.query(LimsAuditTask).filter(LimsAuditTask.business_name.contains(task.client_name)).first()
     if audit_task:
-        audit_task.current_node = "采样实施"
+        audit_task.current_node = "采样前准备"
         history_list = []
         if audit_task.audit_history:
             try:
@@ -186,15 +187,15 @@ def submit_sampling(entrust_id: int, db: Session = Depends(get_db)):
                 h["completion_status"] = "已完成"
                 h["action"] = "提交采样"
                 h["operate_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                h["comment"] = "已完成委托下单并下发采样任务，进入第二阶段采样"
+                h["comment"] = "已完成委托下单并下发采样任务，进入第二阶段【采样前准备】"
                 break
         history_list.append({
-            "node_name": "采样任务实施",
+            "node_name": "采样前准备",
             "operator": "超级管理员",
-            "action": "待采样",
+            "action": "待处理",
             "operate_time": "-",
             "completion_status": "处理中",
-            "comment": "采样组外勤准备与现场采样"
+            "comment": "请指派采样起止时间、调度检测仪器、分配车辆与采样人员、在线绘制点位图并预览分瓶方案"
         })
         audit_task.audit_history = json.dumps(history_list, ensure_ascii=False)
 
@@ -900,6 +901,115 @@ def approve_audit_task(task_id: int, payload: AuditTaskApprove, db: Session = De
                 "completion_status": "处理中",
                 "comment": f"退回合同录入重新修改完善（原因：{payload.audit_comment}）"
             })
+
+    elif curr_node in ["采样前准备", "采样任务实施"]:
+        if action_name == "同意":
+            # 校验必填项：采样时间、仪器、人员（采样员与采样队长）
+            prep_data = payload.sampling_prep_data or {}
+            start_time = prep_data.get("start_time")
+            end_time = prep_data.get("end_time")
+            instruments = prep_data.get("instruments") or []
+            personnel = prep_data.get("personnel") or []
+
+            if not start_time or not end_time:
+                return StandardResponse(code=400, msg="【采样开始时间】与【采样结束时间】为必填项，请在第二栏完整选择！")
+            if len(instruments) == 0:
+                return StandardResponse(code=400, msg="【检测仪器】为必填项，请在第三栏添加至少 1 台检测仪器！")
+            if len(personnel) == 0:
+                return StandardResponse(code=400, msg="【采样人员】为必填项，请在第四栏添加至少 1 名采样人员！")
+            has_leader = any(p.get("is_leader") or p.get("role") == "采样队长" for p in personnel)
+            if not has_leader:
+                return StandardResponse(code=400, msg="【采样人员】中必须指定至少 1 名【采样队长】，请核对人员身份设置！")
+
+            # 保存持久化采样前准备数据
+            prep_record = db.query(LimsSamplingPreparation).filter(LimsSamplingPreparation.audit_task_id == task_id).first()
+            if not prep_record:
+                prep_record = LimsSamplingPreparation(
+                    audit_task_id=task_id,
+                    contract_id=task.contract_id,
+                    start_time=start_time,
+                    end_time=end_time,
+                    remark=prep_data.get("remark", ""),
+                    rule_name=prep_data.get("rule_name", "《地表水和污水监测技术规范 HJ 91.1-2019》"),
+                    instruments_json=json.dumps(instruments, ensure_ascii=False),
+                    vehicles_json=json.dumps(prep_data.get("vehicles", []), ensure_ascii=False),
+                    personnel_json=json.dumps(personnel, ensure_ascii=False),
+                    canvas_data_json=json.dumps(prep_data.get("canvas_data", {}), ensure_ascii=False) if prep_data.get("canvas_data") else None,
+                    bottles_preview_json=json.dumps(prep_data.get("bottles_preview", []), ensure_ascii=False),
+                    status="已完成"
+                )
+                db.add(prep_record)
+            else:
+                prep_record.start_time = start_time
+                prep_record.end_time = end_time
+                prep_record.remark = prep_data.get("remark", "")
+                prep_record.rule_name = prep_data.get("rule_name", "《地表水和污水监测技术规范 HJ 91.1-2019》")
+                prep_record.instruments_json = json.dumps(instruments, ensure_ascii=False)
+                prep_record.vehicles_json = json.dumps(prep_data.get("vehicles", []), ensure_ascii=False)
+                prep_record.personnel_json = json.dumps(personnel, ensure_ascii=False)
+                if prep_data.get("canvas_data"):
+                    prep_record.canvas_data_json = json.dumps(prep_data.get("canvas_data", {}), ensure_ascii=False)
+                prep_record.bottles_preview_json = json.dumps(prep_data.get("bottles_preview", []), ensure_ascii=False)
+                prep_record.status = "已完成"
+
+            task.current_node = "现场确认方案"
+            task.is_finished = "否"
+            task.audit_result = "待现场确认"
+            completion = "已完成"
+
+            for h in history_list:
+                if h.get("node_name") in ["采样前准备", "采样任务实施"]:
+                    h["operator"] = payload.handler or "超级管理员"
+                    h["action"] = action_name
+                    h["operate_time"] = now_str
+                    h["completion_status"] = completion
+                    h["comment"] = payload.audit_comment or f"采样准备完成，已指派{len(personnel)}人、{len(instruments)}台仪器，预约时间段：{start_time} ~ {end_time}"
+                    break
+            history_list.append({
+                "node_name": "现场确认方案",
+                "operator": "现场采样组",
+                "action": "待处理",
+                "operate_time": "-",
+                "completion_status": "处理中",
+                "comment": "等待采样工作组抵达现场，与企业环境负责人现场确认点位排布、工况条件与安全防范方案"
+            })
+
+        elif action_name == "驳回":
+            task.current_node = "流程终止 / 已驳回"
+            task.is_finished = "是"
+            task.audit_result = "驳回"
+            completion = "已驳回"
+            for h in history_list:
+                if h.get("node_name") in ["采样前准备", "采样任务实施"]:
+                    h["operator"] = payload.handler or "超级管理员"
+                    h["action"] = action_name
+                    h["operate_time"] = now_str
+                    h["completion_status"] = completion
+                    h["comment"] = payload.audit_comment or "采样准备审核不通过，流程终止"
+                    break
+
+        elif action_name in ["回退", "退回"]:
+            task.current_node = "委托下单"
+            task.is_finished = "否"
+            task.audit_result = "已回退"
+            completion = "已回退"
+            for h in history_list:
+                if h.get("node_name") in ["采样前准备", "采样任务实施"]:
+                    h["operator"] = payload.handler or "超级管理员"
+                    h["action"] = action_name
+                    h["operate_time"] = now_str
+                    h["completion_status"] = completion
+                    h["comment"] = payload.audit_comment or "回退至委托下单节点"
+                    break
+            history_list.append({
+                "node_name": "委托下单",
+                "operator": "超级管理员",
+                "action": "待处理",
+                "operate_time": "-",
+                "completion_status": "处理中",
+                "comment": f"采样任务退回委托下单重新调整（原因：{payload.audit_comment}）"
+            })
+
     else:
         # 其他节点通用处理
         task.current_node = "流程结束"
@@ -909,6 +1019,186 @@ def approve_audit_task(task_id: int, payload: AuditTaskApprove, db: Session = De
     task.audit_history = json.dumps(history_list, ensure_ascii=False)
     db.commit()
     return StandardResponse(msg=f"审批操作成功：【{action_name}】，任务已流转！")
+
+
+
+
+# ----------------- 采样阶段核心接口 -----------------
+@router.get("/sampling/presets", response_model=StandardResponse)
+def get_sampling_presets(
+    instrument_code: str = None,
+    instrument_name: str = None
+):
+    instruments = [
+        {"instrument_code": "YQ-2026-001", "instrument_name": "便携式多参数水质测定仪", "instrument_model": "YSI ProDSS", "reservation_record": "空闲可用", "instrument_type": "现场便携水质仪", "status": "正常在库"},
+        {"instrument_code": "YQ-2026-002", "instrument_name": "自动烟尘烟气综合测试仪", "instrument_model": "崂应3012H", "reservation_record": "空闲可用", "instrument_type": "废气采样仪器", "status": "正常在库"},
+        {"instrument_code": "YQ-2026-003", "instrument_name": "便携式紫外差分烟气分析仪", "instrument_model": "Gasmet DX4000", "reservation_record": "空闲可用", "instrument_type": "现场烟气分析仪", "status": "正常在库"},
+        {"instrument_code": "YQ-2026-004", "instrument_name": "多功能精密声级计", "instrument_model": "AWA6228+", "reservation_record": "空闲可用", "instrument_type": "噪声检测仪", "status": "正常在库"},
+        {"instrument_code": "YQ-2026-005", "instrument_name": "便携式氢火焰离子化(FID)分析仪", "instrument_model": "Thermo FID-700", "reservation_record": "09-29已被预约", "instrument_type": "VOCs现场分析仪", "status": "正常在库"},
+        {"instrument_code": "YQ-2026-006", "instrument_name": "智能大流量TSP/PM10颗粒物采样器", "instrument_model": "崂应2030", "reservation_record": "空闲可用", "instrument_type": "空气颗粒物采样器", "status": "正常在库"},
+        {"instrument_code": "YQ-2026-007", "instrument_name": "便携式重金属快速水质测定仪", "instrument_model": "PDV6000plus", "reservation_record": "空闲可用", "instrument_type": "重金属快速测定仪", "status": "正常在库"},
+        {"instrument_code": "YQ-2026-008", "instrument_name": "便携式明渠流速流量仪", "instrument_model": "LS300-A", "reservation_record": "空闲可用", "instrument_type": "水文流速仪", "status": "正常在库"}
+    ]
+
+    if instrument_code:
+        instruments = [i for i in instruments if instrument_code.strip().lower() in i["instrument_code"].lower()]
+    if instrument_name:
+        instruments = [i for i in instruments if instrument_name.strip() in i["instrument_name"]]
+
+    vehicles = [
+        {"plate_number": "浙A·8889L (环境采样专车01)", "reservation_record": "空闲可用", "status": "车况良好"},
+        {"plate_number": "浙A·5678B (外勤应急检测车02)", "reservation_record": "空闲可用", "status": "车况良好"},
+        {"plate_number": "浙A·3342E (废气采样工作车03)", "reservation_record": "空闲可用", "status": "车况良好"},
+        {"plate_number": "浙A·9912A (普通外勤巡检车04)", "reservation_record": "明日维保排班", "status": "维保中"}
+    ]
+
+    personnel = [
+        {"name": "张建国", "reservation_record": "在岗空闲", "role": "采样队长", "is_leader": True, "qualification": "水质/废气现场高级采样证"},
+        {"name": "李明辉", "reservation_record": "在岗空闲", "role": "采样员", "is_leader": False, "qualification": "地表水现场采样资质"},
+        {"name": "王子轩", "reservation_record": "在岗空闲", "role": "采样员", "is_leader": False, "qualification": "噪声与振动现场检测资质"},
+        {"name": "赵海燕", "reservation_record": "在岗空闲", "role": "采样员", "is_leader": False, "qualification": "固定污染源废气监测资质"},
+        {"name": "陈小敏", "reservation_record": "在岗空闲", "role": "采样队长", "is_leader": False, "qualification": "生态环境现场采样综合资质"},
+        {"name": "周建平", "reservation_record": "外勤出差中", "role": "采样员", "is_leader": False, "qualification": "土壤与沉积物采样资质"}
+    ]
+
+    rules = [
+        {"rule_name": "《地表水和污水监测技术规范 HJ 91.1-2019》", "is_default": True, "category": "水质类"},
+        {"rule_name": "《固定污染源废气监测技术规范 HJ/T 397-2007》", "is_default": False, "category": "气类"},
+        {"rule_name": "《环境空气质量手工监测技术规范 HJ 194-2017》", "is_default": False, "category": "气类"},
+        {"rule_name": "《土壤环境监测技术规范 HJ/T 166-2004》", "is_default": False, "category": "土壤类"},
+        {"rule_name": "《声环境质量标准与测量规范 GB 3096-2008》", "is_default": False, "category": "噪声类"},
+        {"rule_name": "《地下水环境监测技术规范 HJ 164-2020》", "is_default": False, "category": "水质类"}
+    ]
+
+    return StandardResponse(data={
+        "instruments": instruments,
+        "vehicles": vehicles,
+        "personnel": personnel,
+        "rules": rules
+    })
+
+@router.get("/sampling/preparation/{task_id}", response_model=StandardResponse)
+def get_sampling_preparation(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(LimsAuditTask).filter(LimsAuditTask.id == task_id).first()
+    if not task:
+        return StandardResponse(code=404, msg="任务不存在")
+
+    record = db.query(LimsSamplingPreparation).filter(LimsSamplingPreparation.audit_task_id == task_id).first()
+    if record:
+        res = {
+            "id": record.id,
+            "audit_task_id": record.audit_task_id,
+            "contract_id": record.contract_id,
+            "start_time": record.start_time or "",
+            "end_time": record.end_time or "",
+            "remark": record.remark or "",
+            "rule_name": record.rule_name or "《地表水和污水监测技术规范 HJ 91.1-2019》",
+            "instruments": json.loads(record.instruments_json) if record.instruments_json else [],
+            "vehicles": json.loads(record.vehicles_json) if record.vehicles_json else [],
+            "personnel": json.loads(record.personnel_json) if record.personnel_json else [],
+            "canvas_data": json.loads(record.canvas_data_json) if record.canvas_data_json else None,
+            "bottles_preview": json.loads(record.bottles_preview_json) if record.bottles_preview_json else [],
+            "status": record.status
+        }
+        return StandardResponse(data=res)
+
+    # 默认初始化
+    contract = None
+    if task.contract_id:
+        contract = db.query(LimsContract).filter(LimsContract.id == task.contract_id).first()
+
+    # 提取点位
+    point_names_list = []
+    if contract and contract.monitoring_schemes:
+        try:
+            schemes = json.loads(contract.monitoring_schemes)
+            for sc in schemes:
+                p_str = sc.get("point_names", "")
+                for p in p_str.replace("、", ",").replace("，", ",").split(","):
+                    p = p.strip()
+                    if p and p not in point_names_list:
+                        point_names_list.append(p)
+        except:
+            pass
+
+    if not point_names_list:
+        point_names_list = ["1#综合废水总排口", "2#雨水排放口", "厂界无组织监控点"]
+
+    # 默认分瓶预览
+    default_bottles = [
+        {"bottle_code": "YP2026-B01", "container": "1000ml 聚乙烯塑料瓶", "preservative": "加硫酸调至 pH < 2，4℃冷藏", "items": "CODcr、氨氮、总磷、总氮", "volume": "1000 mL", "points": "、".join(point_names_list[:2])},
+        {"bottle_code": "YP2026-B02", "container": "500ml 棕色磨口玻璃瓶", "preservative": "加NaOH固定(pH>12)并加CuSO4，4℃避光", "items": "挥发酚、氰化物", "volume": "500 mL", "points": point_names_list[0]},
+        {"bottle_code": "YP2026-B03", "container": "1000ml 广口棕色玻璃瓶", "preservative": "加盐酸酸化至 pH < 2，4℃冷藏", "items": "石油类、动植物油", "volume": "1000 mL", "points": point_names_list[0]},
+        {"bottle_code": "YP2026-B04", "container": "500ml 聚乙烯塑料瓶", "preservative": "加高纯浓硝酸酸化至 pH < 2", "items": "铜、锌、铅、镉、总铬", "volume": "500 mL", "points": "、".join(point_names_list[:2])},
+        {"bottle_code": "YP2026-B05", "container": "10L 氟塑料专用采气袋", "preservative": "避光常温密闭保存，24h内完成分析", "items": "非甲烷总烃、苯系物", "volume": "10 L", "points": "厂界上风向、厂界下风向"}
+    ]
+
+    return StandardResponse(data={
+        "audit_task_id": task_id,
+        "contract_id": task.contract_id,
+        "start_time": "",
+        "end_time": "",
+        "remark": "",
+        "rule_name": "《地表水和污水监测技术规范 HJ 91.1-2019》",
+        "instruments": [
+            {"instrument_code": "YQ-2026-001", "instrument_name": "便携式多参数水质测定仪", "instrument_model": "YSI ProDSS", "reservation_record": "空闲可用", "instrument_type": "现场便携水质仪", "status": "正常在库"}
+        ],
+        "vehicles": [
+            {"plate_number": "浙A·8889L (环境采样专车01)", "reservation_record": "空闲可用", "status": "车况良好"}
+        ],
+        "personnel": [
+            {"name": "张建国", "reservation_record": "在岗空闲", "role": "采样队长", "is_leader": True, "qualification": "水质/废气现场高级采样证"},
+            {"name": "李明辉", "reservation_record": "在岗空闲", "role": "采样员", "is_leader": False, "qualification": "地表水现场采样资质"}
+        ],
+        "canvas_data": {
+            "bg_image": "",
+            "markers": [],
+            "strokes": []
+        },
+        "points_list": point_names_list,
+        "bottles_preview": default_bottles,
+        "status": "草稿"
+    })
+
+@router.post("/sampling/preparation/{task_id}/save", response_model=StandardResponse)
+def save_sampling_preparation(task_id: int, form_data: SamplingPreparationSave, db: Session = Depends(get_db)):
+    task = db.query(LimsAuditTask).filter(LimsAuditTask.id == task_id).first()
+    if not task:
+        return StandardResponse(code=404, msg="任务不存在")
+
+    record = db.query(LimsSamplingPreparation).filter(LimsSamplingPreparation.audit_task_id == task_id).first()
+    if not record:
+        record = LimsSamplingPreparation(
+            audit_task_id=task_id,
+            contract_id=task.contract_id,
+            start_time=form_data.start_time,
+            end_time=form_data.end_time,
+            remark=form_data.remark,
+            rule_name=form_data.rule_name,
+            instruments_json=json.dumps(form_data.instruments or [], ensure_ascii=False),
+            vehicles_json=json.dumps(form_data.vehicles or [], ensure_ascii=False),
+            personnel_json=json.dumps(form_data.personnel or [], ensure_ascii=False),
+            canvas_data_json=json.dumps(form_data.canvas_data or {}, ensure_ascii=False) if form_data.canvas_data else None,
+            bottles_preview_json=json.dumps(form_data.bottles_preview or [], ensure_ascii=False),
+            status="已暂存"
+        )
+        db.add(record)
+    else:
+        record.start_time = form_data.start_time
+        record.end_time = form_data.end_time
+        record.remark = form_data.remark
+        record.rule_name = form_data.rule_name
+        record.instruments_json = json.dumps(form_data.instruments or [], ensure_ascii=False)
+        record.vehicles_json = json.dumps(form_data.vehicles or [], ensure_ascii=False)
+        record.personnel_json = json.dumps(form_data.personnel or [], ensure_ascii=False)
+        if form_data.canvas_data:
+            record.canvas_data_json = json.dumps(form_data.canvas_data, ensure_ascii=False)
+        record.bottles_preview_json = json.dumps(form_data.bottles_preview or [], ensure_ascii=False)
+        record.status = "已暂存"
+
+    db.commit()
+    return StandardResponse(msg="采样前准备配置已成功暂存！")
+
 
 
 

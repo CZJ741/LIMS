@@ -319,6 +319,71 @@
       margin-right: 8px;
       font-size: 14px;
     }
+    /* 采样前准备工作台专属样式 */
+    .sampling-section-card {
+      background: #ffffff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    }
+    .sampling-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed #f0f0f0;
+    }
+    .sampling-section-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1f1f1f;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sampling-canvas-wrapper {
+      position: relative;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      background: #ffffff;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .sampling-canvas {
+      display: block;
+      cursor: crosshair;
+      background-color: #ffffff;
+    }
+    .point-tag-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+      background: #fafafa;
+    }
+    .point-tag-item.active {
+      border-color: #1890ff;
+      background: #e6f7ff;
+      color: #1890ff;
+      font-weight: 600;
+    }
+    .point-tag-item.placed {
+      border-color: #52c41a;
+      background: #f6ffed;
+      color: #389e0d;
+    }
   </style>
 </head>
 <body>
@@ -806,8 +871,456 @@
             </div>
           </div>
 
-          <!-- 1.2 报价审核、合同录入与合同确认操作页面（在页面中进行，非弹窗模式） Tab -->
+          <!-- 1.2 审批任务操作页面 (如果当前节点是【采样前准备】，进入专属采样准备工作台) -->
           <div v-if="activeTab === 'task-audit-operate'">
+
+            <!-- A. 采样前准备专用全景工作台 (7大功能栏) -->
+            <div v-if="currentAuditTask.current_node === '采样前准备' || currentAuditTask.current_node === '采样任务实施'">
+              <!-- 顶部操作条 -->
+              <div class="action-bar" style="border-left-color: #1890ff;">
+                <div class="action-bar-title" style="display: flex; align-items: center; gap: 10px;">
+                  <span>🚗</span>
+                  <span style="font-weight: 700; font-size: 16px;">采样前准备工作台</span>
+                  <el-tag type="primary" size="default">当前节点：采样前准备</el-tag>
+                  <el-tag type="info" size="default">业务编号：{{ currentAuditTask.business_code }}</el-tag>
+                  <span style="font-size: 13px; color: #8c8c8c; margin-left: 8px;">{{ currentAuditTask.business_name }}</span>
+                </div>
+                <div class="action-bar-btns">
+                  <el-button @click="backToAuditTaskList">⬅️ 返回任务列表</el-button>
+                  <el-button type="info" plain @click="saveSamplingPrepDraft">💾 暂存草稿</el-button>
+                  <el-button type="success" size="default" style="font-weight: 600;" @click="submitSamplingPrepApprove">
+                    ✅ 同意（进入现场确认方案）
+                  </el-button>
+                </div>
+              </div>
+
+              <!-- 第一栏：合同大致信息 -->
+              <div class="sampling-section-card">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>📋</span>
+                    <span>第一栏：合同大致信息</span>
+                  </div>
+                  <el-tag size="small" type="info">只读概览</el-tag>
+                </div>
+                <el-descriptions :column="3" border size="default">
+                  <el-descriptions-item label="合同编号">
+                    <span style="font-weight: 600; color: #1890ff;">{{ currentAuditContract.contract_code || currentAuditTask.business_code || 'HT-20260901001' }}</span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="合同名称">
+                    {{ currentAuditContract.contract_name || currentAuditTask.business_name }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="委托单位">
+                    {{ currentAuditContract.client_name || '未填写' }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="受检单位">
+                    {{ currentAuditContract.tested_company || currentAuditContract.client_name || '同委托单位' }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="监测类型">
+                    <el-tag size="small" type="primary">{{ currentAuditContract.detection_type || '水质与综合环境检测' }}</el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="业务类型">
+                    {{ currentAuditContract.biz_type || '环境质量检测' }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="检测周期">
+                    {{ currentAuditContract.start_date || '2026-09-20' }} 至 {{ currentAuditContract.end_date || '2026-10-30' }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="合同金额">
+                    <span style="color: #cf1322; font-weight: 600;">¥{{ (currentAuditContract.contract_amount || 32000).toLocaleString() }}</span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="样品送达/处置方式">
+                    {{ currentAuditContract.sample_delivery_method || '现场采样上门' }} / {{ currentAuditContract.sample_disposal || '留样备查' }}
+                  </el-descriptions-item>
+                </el-descriptions>
+              </div>
+
+              <!-- 第二栏：采样起止时间与备注 (必填项) -->
+              <div class="sampling-section-card">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>⏱️</span>
+                    <span>第二栏：填写采样开始以及结束时间与备注</span>
+                    <el-tag size="small" type="danger" effect="plain" style="margin-left: 6px;">* 采样时间为必填项</el-tag>
+                  </div>
+                </div>
+                <el-form label-width="120px" size="default">
+                  <el-row :gutter="20">
+                    <el-col :span="12">
+                      <el-form-item label="采样开始时间" required>
+                        <el-date-picker
+                          v-model="samplingPrepForm.start_time"
+                          type="datetime"
+                          placeholder="选择采样开始时间"
+                          format="YYYY-MM-DD HH:mm:ss"
+                          value-format="YYYY-MM-DD HH:mm:ss"
+                          style="width: 100%"
+                        ></el-date-picker>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                      <el-form-item label="采样结束时间" required>
+                        <el-date-picker
+                          v-model="samplingPrepForm.end_time"
+                          type="datetime"
+                          placeholder="选择采样结束时间"
+                          format="YYYY-MM-DD HH:mm:ss"
+                          value-format="YYYY-MM-DD HH:mm:ss"
+                          style="width: 100%"
+                        ></el-date-picker>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="20">
+                    <el-col :span="24">
+                      <el-form-item label="采样前备注">
+                        <el-input
+                          v-model="samplingPrepForm.remark"
+                          type="textarea"
+                          :rows="2"
+                          placeholder="请输入现场采样特殊防护要求、配合部门、天气关注点或门禁预约等备注信息..."
+                        ></el-input>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </el-form>
+              </div>
+
+              <!-- 第三栏：检测仪器 (必填项，支持新增和删除) -->
+              <div class="sampling-section-card">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>🔬</span>
+                    <span>第三栏：检测仪器</span>
+                    <el-tag size="small" type="danger" effect="plain" style="margin-left: 6px;">* 仪器为必填项（至少选择1台）</el-tag>
+                  </div>
+                  <div>
+                    <el-button type="primary" size="small" @click="openAddInstrumentDialog">
+                      <span>➕ 新增仪器</span>
+                    </el-button>
+                  </div>
+                </div>
+                <el-table :data="samplingPrepForm.instruments" border stripe size="default" empty-text="暂未添加检测仪器，请点击上方按钮新增仪器">
+                  <el-table-column type="index" label="序号" width="55" align="center"></el-table-column>
+                  <el-table-column prop="instrument_code" label="仪器编号" width="140" align="center">
+                    <template #default="{ row }">
+                      <span style="font-weight: 600; color: #1890ff;">{{ row.instrument_code }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="instrument_name" label="仪器名称" min-width="180"></el-table-column>
+                  <el-table-column prop="instrument_model" label="仪器型号" width="140"></el-table-column>
+                  <el-table-column prop="reservation_record" label="预约记录" width="140" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="row.reservation_record.includes('空闲') ? 'success' : 'warning'" size="small">
+                        {{ row.reservation_record }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="instrument_type" label="仪器类型" width="140"></el-table-column>
+                  <el-table-column prop="status" label="仪器状态" width="110" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="row.status.includes('正常') ? 'success' : 'info'" size="small">
+                        {{ row.status }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="90" align="center">
+                    <template #default="{ $index }">
+                      <el-button type="danger" link size="small" @click="removeInstrument($index)">
+                        🗑️ 删除
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+
+              <!-- 第四栏：车辆管理以及人员管理 (人员为必填项) -->
+              <div class="sampling-section-card">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>🚙 👥</span>
+                    <span>第四栏：车辆管理以及人员管理</span>
+                    <el-tag size="small" type="danger" effect="plain" style="margin-left: 6px;">* 人员为必填项（需含采样队长）</el-tag>
+                  </div>
+                </div>
+                <el-row :gutter="20">
+                  <!-- 车辆管理 -->
+                  <el-col :span="11">
+                    <div style="background: #fafafa; border: 1px solid #ebebeb; border-radius: 6px; padding: 12px 14px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-weight: 600; font-size: 14px; color: #262626;">🚙 车辆管理</span>
+                        <el-button type="primary" link size="small" @click="openAddVehicleDialog">➕ 添加车辆</el-button>
+                      </div>
+                      <el-table :data="samplingPrepForm.vehicles" border size="small" empty-text="暂未安排车辆">
+                        <el-table-column prop="plate_number" label="车牌号或者车的编号" min-width="170">
+                          <template #default="{ row }">
+                            <span style="font-weight: 600;">{{ row.plate_number }}</span>
+                          </template>
+                        </el-table-column>
+                        <el-table-column prop="reservation_record" label="预约记录" width="110" align="center">
+                          <template #default="{ row }">
+                            <el-tag :type="row.reservation_record.includes('空闲') ? 'success' : 'warning'" size="small">
+                              {{ row.reservation_record }}
+                            </el-tag>
+                          </template>
+                        </el-table-column>
+                        <el-table-column prop="status" label="状态" width="90" align="center">
+                          <template #default="{ row }">
+                            <el-tag type="info" size="small">{{ row.status }}</el-tag>
+                          </template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="70" align="center">
+                          <template #default="{ $index }">
+                            <el-button type="danger" link size="small" @click="removeVehicle($index)">删除</el-button>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </div>
+                  </el-col>
+
+                  <!-- 人员管理 -->
+                  <el-col :span="13">
+                    <div style="background: #fafafa; border: 1px solid #ebebeb; border-radius: 6px; padding: 12px 14px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <span style="font-weight: 600; font-size: 14px; color: #262626;">👥 人员管理</span>
+                          <el-tag size="small" type="danger">必须有至少1名采样队长</el-tag>
+                        </div>
+                        <el-button type="primary" link size="small" @click="openAddPersonnelDialog">➕ 添加人员</el-button>
+                      </div>
+                      <el-table :data="samplingPrepForm.personnel" border size="small" empty-text="暂未安排采样人员">
+                        <el-table-column prop="name" label="人员名称" width="95" align="center">
+                          <template #default="{ row }">
+                            <span style="font-weight: 600;">{{ row.name }}</span>
+                          </template>
+                        </el-table-column>
+                        <el-table-column prop="reservation_record" label="预约记录" width="95" align="center">
+                          <template #default="{ row }">
+                            <el-tag :type="row.reservation_record.includes('空闲') ? 'success' : 'warning'" size="small">
+                              {{ row.reservation_record }}
+                            </el-tag>
+                          </template>
+                        </el-table-column>
+                        <el-table-column label="身份（采样员/采样队长）" min-width="160" align="center">
+                          <template #default="{ row, $index }">
+                            <el-radio-group v-model="row.role" size="small" @change="handleRoleChange(row, $index)">
+                              <el-radio-button label="采样员"></el-radio-button>
+                              <el-radio-button label="采样队长"></el-radio-button>
+                            </el-radio-group>
+                          </template>
+                        </el-table-column>
+                        <el-table-column prop="is_leader" label="是否队长" width="90" align="center">
+                          <template #default="{ row }">
+                            <el-tag :type="row.is_leader ? 'danger' : 'info'" size="small" effect="dark">
+                              {{ row.is_leader ? '⭐ 队长' : '队员' }}
+                            </el-tag>
+                          </template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="70" align="center">
+                          <template #default="{ $index }">
+                            <el-button type="danger" link size="small" @click="removePersonnel($index)">删除</el-button>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </div>
+                  </el-col>
+                </el-row>
+              </div>
+
+              <!-- 第五栏：在线画点位图 (交互式 Canvas) -->
+              <div class="sampling-section-card">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>🗺️</span>
+                    <span>第五栏：在线画点位图</span>
+                  </div>
+                  <div style="font-size: 13px; color: #8c8c8c;">
+                    提示：在下方点位列表中选中点位后，在画布上点击即可放置标注；可上传底图，或直接在空白画布上标记点位。
+                  </div>
+                </div>
+
+                <!-- 点位列表 -->
+                <div style="margin-bottom: 12px; background: #f0f7ff; border: 1px solid #bae7ff; border-radius: 6px; padding: 10px 14px;">
+                  <div style="font-size: 13px; font-weight: 600; color: #0050b3; margin-bottom: 6px;">
+                    📍 点位列表（点击点位后在画布上点击放置标注）：
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <div
+                      v-for="(point, idx) in samplingPointsList"
+                      :key="idx"
+                      class="point-tag-item"
+                      :class="{
+                        active: activePointToPlace === point,
+                        placed: isPointPlaced(point)
+                      }"
+                      @click="selectPointForMarker(point)"
+                    >
+                      <span>{{ isPointPlaced(point) ? '✅' : '📍' }}</span>
+                      <span>{{ point }}</span>
+                      <el-tag v-if="isPointPlaced(point)" size="small" type="success" effect="dark" style="margin-left: 4px;">已标点</el-tag>
+                      <el-tag v-else size="small" type="info" style="margin-left: 4px;">待标点</el-tag>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 工具栏 -->
+                <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; background: #fafafa; border: 1px solid #e8e8e8; border-radius: 6px 6px 0 0; padding: 10px 14px; gap: 8px;">
+                  <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <span style="font-weight: 600; font-size: 13px; color: #595959;">工具：</span>
+                    <el-button-group size="small">
+                      <el-button :type="canvasMode === 'marker' ? 'primary' : 'default'" @click="canvasMode = 'marker'">
+                        📍 标注点位
+                      </el-button>
+                      <el-button :type="canvasMode === 'pen' ? 'primary' : 'default'" @click="canvasMode = 'pen'">
+                        ✏️ 画笔
+                      </el-button>
+                      <el-button :type="canvasMode === 'eraser' ? 'primary' : 'default'" @click="canvasMode = 'eraser'">
+                        🧽 擦除
+                      </el-button>
+                    </el-button-group>
+
+                    <div style="display: flex; align-items: center; margin-left: 10px; gap: 6px;">
+                      <span style="font-size: 12px; color: #595959;">线宽:</span>
+                      <el-select v-model="penWidth" size="small" style="width: 80px;">
+                        <el-option label="1px" :value="1"></el-option>
+                        <el-option label="2px" :value="2"></el-option>
+                        <el-option label="4px" :value="4"></el-option>
+                        <el-option label="6px" :value="6"></el-option>
+                      </el-select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; margin-left: 10px; gap: 6px;">
+                      <span style="font-size: 12px; color: #595959;">颜色:</span>
+                      <input type="color" v-model="penColor" style="width: 32px; height: 26px; border: none; cursor: pointer; border-radius: 4px;" />
+                    </div>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="file" ref="canvasBgInput" accept="image/*" style="display: none" @change="handleUploadBgImage" />
+                    <el-button size="small" type="primary" plain @click="$refs.canvasBgInput.click()">
+                      🖼️ 上传底图
+                    </el-button>
+                    <el-button size="small" @click="setBlankCanvas">
+                      📄 空白画布
+                    </el-button>
+                    <el-button size="small" @click="undoCanvas">
+                      ↩️ 撤销标注
+                    </el-button>
+                    <el-button size="small" type="danger" plain @click="clearCanvas">
+                      🗑️ 清空全部
+                    </el-button>
+                  </div>
+                </div>
+
+                <!-- Canvas 画布容器 -->
+                <div class="sampling-canvas-wrapper" style="border-top: none; border-radius: 0 0 6px 6px;">
+                  <canvas
+                    ref="samplingCanvasRef"
+                    width="1100"
+                    height="500"
+                    class="sampling-canvas"
+                    @mousedown="handleCanvasMouseDown"
+                    @mousemove="handleCanvasMouseMove"
+                    @mouseup="handleCanvasMouseUp"
+                    @mouseleave="handleCanvasMouseLeave"
+                  ></canvas>
+                </div>
+              </div>
+
+              <!-- 第六栏：采样规则选择 -->
+              <div class="sampling-section-card">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>📜</span>
+                    <span>第六栏：采样规则选择</span>
+                  </div>
+                </div>
+                <el-form label-width="120px" size="default">
+                  <el-form-item label="采样标准规范">
+                    <el-select v-model="samplingPrepForm.rule_name" style="width: 100%" placeholder="请选择适用的采样标准规范">
+                      <el-option
+                        v-for="(r, rIdx) in presetRules"
+                        :key="rIdx"
+                        :label="r.rule_name + (r.is_default ? ' (默认采样规则)' : '')"
+                        :value="r.rule_name"
+                      >
+                        <span style="float: left;">{{ r.rule_name }}</span>
+                        <el-tag v-if="r.is_default" size="small" type="success" style="float: right;">默认采样规则</el-tag>
+                        <el-tag v-else size="small" type="info" style="float: right;">{{ r.category }}</el-tag>
+                      </el-option>
+                    </el-select>
+                  </el-form-item>
+                </el-form>
+              </div>
+
+              <!-- 第七栏：分瓶预览 -->
+              <div class="sampling-section-card">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>🧪</span>
+                    <span>第七栏：分瓶预览</span>
+                  </div>
+                  <el-tag size="small" type="primary">根据监测方案与行业规范智能生成</el-tag>
+                </div>
+                <el-table :data="samplingPrepForm.bottles_preview" border stripe size="default">
+                  <el-table-column type="index" label="序号" width="55" align="center"></el-table-column>
+                  <el-table-column prop="bottle_code" label="分瓶条码预编码" width="140" align="center">
+                    <template #default="{ row }">
+                      <el-tag size="small" effect="dark" type="primary" style="font-family: monospace; letter-spacing: 1px;">
+                        {{ row.bottle_code }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="container" label="容器类型及规格" min-width="160">
+                    <template #default="{ row }">
+                      <span style="font-weight: 600;">{{ row.container }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="preservative" label="固定剂与保存方法" min-width="220">
+                    <template #default="{ row }">
+                      <span style="color: #d46b08;">{{ row.preservative }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="items" label="对应检测项" min-width="180"></el-table-column>
+                  <el-table-column prop="volume" label="采样体积" width="100" align="center"></el-table-column>
+                  <el-table-column prop="points" label="对应点位" min-width="140"></el-table-column>
+                </el-table>
+              </div>
+
+              <!-- 底部审批操作与意见栏 -->
+              <div class="sampling-section-card" style="border-top: 3px solid #52c41a;">
+                <div class="sampling-section-header">
+                  <div class="sampling-section-title">
+                    <span>✍️</span>
+                    <span>审批批注与推进结论</span>
+                  </div>
+                  <div>
+                    <span style="font-size: 13px; color: #595959; margin-right: 8px;">操作人：</span>
+                    <el-tag size="small" type="primary" effect="dark">超级管理员 (本账号)</el-tag>
+                  </div>
+                </div>
+                <el-form label-width="120px" size="default">
+                  <el-form-item label="审批批注意见">
+                    <el-input
+                      v-model="auditSubmitForm.comment"
+                      type="textarea"
+                      :rows="2"
+                      placeholder="同意采样前准备方案，人员、仪器与车辆已齐备，准予开展现场采样并推进至【现场确认方案】节点"
+                    ></el-input>
+                  </el-form-item>
+                </el-form>
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 14px;">
+                  <el-button @click="backToAuditTaskList">⬅️ 返回任务列表</el-button>
+                  <el-button type="info" plain @click="saveSamplingPrepDraft">💾 暂存草稿</el-button>
+                  <el-button type="success" size="large" style="font-weight: 700; padding: 0 24px;" @click="submitSamplingPrepApprove">
+                    ✅ 同意（进入下一节点：现场确认方案）
+                  </el-button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- B. 原原有其他节点（报价审核、合同录入、合同确认）的操作界面 -->
+            <div v-else>
             <!-- 页面顶部导航栏与返回按钮 -->
             <div class="action-bar" :style="{ borderLeftColor: currentAuditTask.current_node === '合同录入' ? '#52c41a' : (currentAuditTask.current_node === '合同确认' ? '#722ed1' : '#fa8c16') }">
               <div class="action-bar-title" style="display: flex; align-items: center; gap: 10px;">
@@ -1574,6 +2087,7 @@
                 </div>
               </el-col>
             </el-row>
+            </div>
           </div>
 
 
@@ -3572,11 +4086,156 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 11. 新增检测仪器弹窗（支持编号和名称查询、批量勾选加入） -->
+    <el-dialog v-model="addInstrumentDialogVisible" title="🔬 新增检测仪器调度" width="850px" top="8vh">
+      <div style="padding: 10px 4px;">
+        <!-- 搜索栏 -->
+        <div style="background: #fafafa; border: 1px solid #e8e8e8; border-radius: 6px; padding: 12px 16px 2px; margin-bottom: 14px;">
+          <el-form :inline="true" size="default">
+            <el-form-item label="仪器编号">
+              <el-input v-model="instrumentSearch.code" placeholder="如：YQ-2026..." clearable style="width: 180px;"></el-input>
+            </el-form-item>
+            <el-form-item label="仪器名称">
+              <el-input v-model="instrumentSearch.name" placeholder="如：水质测定仪/烟气..." clearable style="width: 180px;"></el-input>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="handleFilterInstruments">🔍 查询</el-button>
+              <el-button @click="handleResetInstrumentSearch">🔄 重置</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <div style="margin-bottom: 8px; font-size: 13px; color: #595959; display: flex; justify-content: space-between; align-items: center;">
+          <span>系统可选仪器列表（后期可由外部直接导入）：</span>
+          <el-tag size="small" type="info">共 {{ filteredPresetInstruments.length }} 台设备</el-tag>
+        </div>
+
+        <el-table
+          ref="instrumentTableRef"
+          :data="filteredPresetInstruments"
+          border
+          stripe
+          max-height="360"
+          @selection-change="handleInstrumentSelectionChange"
+        >
+          <el-table-column type="selection" width="50" align="center"></el-table-column>
+          <el-table-column prop="instrument_code" label="仪器编号" width="130" align="center">
+            <template #default="{ row }">
+              <span style="font-weight: 600; color: #1890ff;">{{ row.instrument_code }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="instrument_name" label="仪器名称" min-width="160"></el-table-column>
+          <el-table-column prop="instrument_model" label="仪器型号" width="130"></el-table-column>
+          <el-table-column prop="reservation_record" label="预约记录" width="130" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.reservation_record.includes('空闲') ? 'success' : 'warning'" size="small">
+                {{ row.reservation_record }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="instrument_type" label="仪器类型" width="130"></el-table-column>
+          <el-table-column prop="status" label="仪器状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.status.includes('正常') ? 'success' : 'info'" size="small">
+                {{ row.status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; color: #8c8c8c;">已勾选 {{ selectedPresetInstruments.length }} 台仪器</span>
+          <div style="display: flex; gap: 10px;">
+            <el-button @click="addInstrumentDialogVisible = false">取消</el-button>
+            <el-button type="primary" :disabled="selectedPresetInstruments.length === 0" @click="confirmAddInstruments">
+              ➕ 确认添加所选仪器
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 12. 添加外勤车辆弹窗 -->
+    <el-dialog v-model="addVehicleDialogVisible" title="🚙 选择外勤采样车辆" width="650px">
+      <div style="padding: 10px 4px;">
+        <el-table :data="presetVehicles" border stripe>
+          <el-table-column prop="plate_number" label="车牌号或车的编号" min-width="180">
+            <template #default="{ row }">
+              <span style="font-weight: 600;">{{ row.plate_number }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="reservation_record" label="预约记录" width="130" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.reservation_record.includes('空闲') ? 'success' : 'warning'" size="small">
+                {{ row.reservation_record }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.status.includes('良好') ? 'success' : 'info'" size="small">
+                {{ row.status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="90" align="center">
+            <template #default="{ row }">
+              <el-button type="primary" size="small" @click="addVehicleFromPreset(row)">添加</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="addVehicleDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 13. 添加采样人员弹窗 -->
+    <el-dialog v-model="addPersonnelDialogVisible" title="👥 选择采样人员与身份" width="700px">
+      <div style="padding: 10px 4px;">
+        <div style="margin-bottom: 10px; font-size: 13px; color: #595959;">
+          提示：每组采样必须指定至少 1 名【采样队长】，可点击表格操作栏快捷加入！
+        </div>
+        <el-table :data="presetPersonnel" border stripe>
+          <el-table-column prop="name" label="人员姓名" width="110" align="center">
+            <template #default="{ row }">
+              <span style="font-weight: 600;">{{ row.name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="qualification" label="专业资质/上岗证" min-width="180"></el-table-column>
+          <el-table-column prop="reservation_record" label="预约记录" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.reservation_record.includes('空闲') ? 'success' : 'warning'" size="small">
+                {{ row.reservation_record }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="role" label="默认岗位" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.role === '采样队长' ? 'danger' : 'info'" size="small">
+                {{ row.role }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="快捷加入" width="180" align="center">
+            <template #default="{ row }">
+              <el-button type="primary" size="small" @click="addPersonnelFromPreset(row, '采样员')">设为采样员</el-button>
+              <el-button type="danger" size="small" @click="addPersonnelFromPreset(row, '采样队长')">设为队长</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="addPersonnelDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 
   <script>
     try {
-      const { createApp, ref, reactive, onMounted } = Vue;
+      const { createApp, ref, reactive, onMounted, computed, nextTick } = Vue;
 
       const app = createApp({
         setup() {
@@ -4368,6 +5027,9 @@
                 currentAuditTask.value = data.data.task || row;
                 currentAuditContract.value = data.data.contract || {};
               }
+              if (row.current_node === '采样前准备' || row.current_node === '采样任务实施') {
+                loadSamplingPrepData(row.id);
+              }
             } catch (e) {
               ElementPlus.ElMessage.error('获取任务详情失败');
             } finally {
@@ -4526,6 +5188,630 @@
             } catch (e) {}
           };
 
+          // ==========================================
+          // 采样阶段：采样前准备核心状态与方法
+          // ==========================================
+          const samplingPrepForm = reactive({
+            start_time: '2026-10-08 08:30:00',
+            end_time: '2026-10-08 17:30:00',
+            remark: '',
+            rule_name: '《地表水和污水监测技术规范 HJ 91.1-2019》',
+            instruments: [],
+            vehicles: [],
+            personnel: [],
+            bottles_preview: []
+          });
+
+          const samplingPointsList = ref([]);
+          const presetInstruments = ref([]);
+          const presetVehicles = ref([]);
+          const presetPersonnel = ref([]);
+          const presetRules = ref([]);
+
+          // 弹窗状态
+          const addInstrumentDialogVisible = ref(false);
+          const addVehicleDialogVisible = ref(false);
+          const addPersonnelDialogVisible = ref(false);
+          const instrumentSearch = reactive({ code: '', name: '' });
+          const selectedPresetInstruments = ref([]);
+
+          // 过滤可选仪器列表
+          const filteredPresetInstruments = computed(() => {
+            return presetInstruments.value.filter(item => {
+              const matchCode = !instrumentSearch.code || item.instrument_code.toLowerCase().includes(instrumentSearch.code.trim().toLowerCase());
+              const matchName = !instrumentSearch.name || item.instrument_name.includes(instrumentSearch.name.trim());
+              return matchCode && matchName;
+            });
+          });
+
+          const handleFilterInstruments = () => {};
+
+          const handleResetInstrumentSearch = () => {
+            instrumentSearch.code = '';
+            instrumentSearch.name = '';
+          };
+
+          const handleInstrumentSelectionChange = (selection) => {
+            selectedPresetInstruments.value = selection;
+          };
+
+          const openAddInstrumentDialog = () => {
+            selectedPresetInstruments.value = [];
+            addInstrumentDialogVisible.value = true;
+          };
+
+          const confirmAddInstruments = () => {
+            selectedPresetInstruments.value.forEach(inst => {
+              const exists = samplingPrepForm.instruments.some(i => i.instrument_code === inst.instrument_code);
+              if (!exists) {
+                samplingPrepForm.instruments.push({ ...inst });
+              }
+            });
+            addInstrumentDialogVisible.value = false;
+            ElementPlus.ElMessage.success('已成功添加所选检测仪器！');
+          };
+
+          const removeInstrument = (index) => {
+            samplingPrepForm.instruments.splice(index, 1);
+            ElementPlus.ElMessage.info('已移除该检测仪器');
+          };
+
+          // 车辆管理
+          const openAddVehicleDialog = () => {
+            addVehicleDialogVisible.value = true;
+          };
+
+          const addVehicleFromPreset = (veh) => {
+            const exists = samplingPrepForm.vehicles.some(v => v.plate_number === veh.plate_number);
+            if (!exists) {
+              samplingPrepForm.vehicles.push({ ...veh });
+              ElementPlus.ElMessage.success(`车辆【${veh.plate_number}】已指派`);
+            } else {
+              ElementPlus.ElMessage.warning('该车辆已在当前派遣列表中');
+            }
+            addVehicleDialogVisible.value = false;
+          };
+
+          const removeVehicle = (index) => {
+            samplingPrepForm.vehicles.splice(index, 1);
+          };
+
+          // 人员管理
+          const openAddPersonnelDialog = () => {
+            addPersonnelDialogVisible.value = true;
+          };
+
+          const addPersonnelFromPreset = (person, role = '采样员') => {
+            const exists = samplingPrepForm.personnel.some(p => p.name === person.name);
+            if (!exists) {
+              const isLeader = (role === '采样队长');
+              samplingPrepForm.personnel.push({
+                name: person.name,
+                reservation_record: person.reservation_record,
+                role: role,
+                is_leader: isLeader,
+                qualification: person.qualification
+              });
+              ElementPlus.ElMessage.success(`已添加人员【${person.name}】（${role}）`);
+            } else {
+              ElementPlus.ElMessage.warning('该人员已在当前采样组名单中');
+            }
+            addPersonnelDialogVisible.value = false;
+          };
+
+          const handleRoleChange = (row, index) => {
+            if (row.role === '采样队长') {
+              row.is_leader = true;
+              ElementPlus.ElMessage.success(`已将【${row.name}】设为采样队长`);
+            } else {
+              row.is_leader = false;
+            }
+          };
+
+          const removePersonnel = (index) => {
+            samplingPrepForm.personnel.splice(index, 1);
+          };
+
+          // ==========================================
+          // 第五栏：在线画点位图 Canvas 互动引擎
+          // ==========================================
+          const samplingCanvasRef = ref(null);
+          const canvasBgInput = ref(null);
+          const canvasMode = ref('marker'); // 'marker' | 'pen' | 'eraser'
+          const activePointToPlace = ref(null);
+          const penWidth = ref(3);
+          const penColor = ref('#f5222d');
+          const placedMarkers = ref([]); // [{ id, point_name, x, y, color, label }]
+          const drawnStrokes = ref([]);  // [{ type: 'stroke', points: [{x, y}], color, width }]
+          const canvasHistory = ref([]);  // history stack for undo
+          const canvasBgImage = ref(null);
+          const canvasBgUrl = ref('');
+          let isCanvasDrawing = false;
+          let currentCanvasStroke = null;
+
+          const isPointPlaced = (pointName) => {
+            return placedMarkers.value.some(m => m.point_name === pointName);
+          };
+
+          const selectPointForMarker = (pointName) => {
+            activePointToPlace.value = pointName;
+            canvasMode.value = 'marker';
+            ElementPlus.ElMessage.info(`已选中点位【${pointName}】，请在下方画布上点击任意位置完成落点标注`);
+          };
+
+          // 绘制网格背景
+          const drawCoordinateGrid = (ctx, width, height) => {
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(0, 0, width, height);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#f0f0f0';
+            const step = 30;
+            for (let x = 0; x < width; x += step) {
+              ctx.beginPath();
+              ctx.moveTo(x, 0);
+              ctx.lineTo(x, height);
+              ctx.stroke();
+            }
+            for (let y = 0; y < height; y += step) {
+              ctx.beginPath();
+              ctx.moveTo(0, y);
+              ctx.lineTo(width, y);
+              ctx.stroke();
+            }
+            ctx.strokeStyle = '#e8e8e8';
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(width / 2, 0);
+            ctx.lineTo(width / 2, height);
+            ctx.stroke();
+
+            ctx.font = '13px sans-serif';
+            ctx.fillStyle = '#bfbfbf';
+            ctx.textAlign = 'right';
+            ctx.fillText('LIMS 采样点位现场坐标系 (空白画布模式)', width - 15, height - 15);
+          };
+
+          // 重绘画布
+          const redrawCanvas = () => {
+            const canvas = samplingCanvasRef.value;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. 底图层
+            if (canvasBgImage.value) {
+              const img = canvasBgImage.value;
+              const scale = Math.min(width / img.width, height / img.height);
+              const nw = img.width * scale;
+              const nh = img.height * scale;
+              const nx = (width - nw) / 2;
+              const ny = (height - nh) / 2;
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, nx, ny, nw, nh);
+            } else {
+              drawCoordinateGrid(ctx, width, height);
+            }
+
+            // 2. 手绘线条层
+            drawnStrokes.value.forEach(stroke => {
+              if (!stroke.points || stroke.points.length === 0) return;
+              ctx.beginPath();
+              ctx.strokeStyle = stroke.color || '#f5222d';
+              ctx.lineWidth = stroke.width || 3;
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
+              ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+              for (let i = 1; i < stroke.points.length; i++) {
+                ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+              }
+              ctx.stroke();
+            });
+
+            // 3. 点位标注层
+            placedMarkers.value.forEach((m, idx) => {
+              const x = m.x;
+              const y = m.y;
+              const label = m.point_name || `点位${idx + 1}`;
+              const color = m.color || '#1890ff';
+
+              // 绘制定位图钉 (针尖指向 x, y)
+              ctx.save();
+              ctx.fillStyle = color;
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+              ctx.shadowBlur = 6;
+              ctx.shadowOffsetY = 3;
+
+              // 图钉头部圆球
+              ctx.beginPath();
+              ctx.arc(x, y - 22, 12, 0, Math.PI * 2);
+              ctx.fill();
+
+              // 图钉针尖三角形
+              ctx.beginPath();
+              ctx.moveTo(x - 6, y - 14);
+              ctx.lineTo(x + 6, y - 14);
+              ctx.lineTo(x, y);
+              ctx.closePath();
+              ctx.fill();
+              ctx.restore();
+
+              // 图钉内序号
+              ctx.font = 'bold 11px sans-serif';
+              ctx.fillStyle = '#ffffff';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(String(idx + 1), x, y - 22);
+
+              // 标注名称文字标签气泡
+              ctx.font = '12px sans-serif';
+              const textMetrics = ctx.measureText(label);
+              const textWidth = textMetrics.width;
+              const padX = 8;
+              const boxW = textWidth + padX * 2;
+              const boxH = 22;
+              const boxX = x - boxW / 2;
+              const boxY = y + 6;
+
+              ctx.fillStyle = 'rgba(0, 21, 41, 0.85)';
+              ctx.beginPath();
+              if (ctx.roundRect) {
+                ctx.roundRect(boxX, boxY, boxW, boxH, 4);
+              } else {
+                ctx.rect(boxX, boxY, boxW, boxH);
+              }
+              ctx.fill();
+
+              ctx.fillStyle = '#ffffff';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(label, x, boxY + boxH / 2);
+            });
+          };
+
+          const getCanvasRelativePos = (e) => {
+            const canvas = samplingCanvasRef.value;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+              x: (e.clientX - rect.left) * scaleX,
+              y: (e.clientY - rect.top) * scaleY
+            };
+          };
+
+          const handleCanvasMouseDown = (e) => {
+            const pos = getCanvasRelativePos(e);
+
+            if (canvasMode.value === 'marker') {
+              if (!activePointToPlace.value) {
+                const unplaced = samplingPointsList.value.find(p => !isPointPlaced(p));
+                if (unplaced) {
+                  activePointToPlace.value = unplaced;
+                } else if (samplingPointsList.value.length > 0) {
+                  activePointToPlace.value = samplingPointsList.value[0];
+                } else {
+                  ElementPlus.ElMessage.warning('暂无可选点位');
+                  return;
+                }
+              }
+
+              const marker = {
+                id: Date.now(),
+                point_name: activePointToPlace.value,
+                x: pos.x,
+                y: pos.y,
+                color: '#1890ff'
+              };
+
+              const existingIdx = placedMarkers.value.findIndex(m => m.point_name === activePointToPlace.value);
+              if (existingIdx >= 0) {
+                placedMarkers.value.splice(existingIdx, 1);
+              }
+              placedMarkers.value.push(marker);
+              canvasHistory.value.push({ type: 'marker', marker });
+              ElementPlus.ElMessage.success(`已在画布放置点位【${marker.point_name}】标注！`);
+
+              const nextUnplaced = samplingPointsList.value.find(p => !isPointPlaced(p));
+              activePointToPlace.value = nextUnplaced || null;
+
+              redrawCanvas();
+
+            } else if (canvasMode.value === 'pen') {
+              isCanvasDrawing = true;
+              currentCanvasStroke = {
+                type: 'stroke',
+                points: [pos],
+                color: penColor.value,
+                width: Number(penWidth.value) || 3
+              };
+              drawnStrokes.value.push(currentCanvasStroke);
+              redrawCanvas();
+
+            } else if (canvasMode.value === 'eraser') {
+              const clickedMarkerIdx = placedMarkers.value.findIndex(m => {
+                const dist = Math.hypot(m.x - pos.x, (m.y - 18) - pos.y);
+                return dist <= 20;
+              });
+
+              if (clickedMarkerIdx >= 0) {
+                const removed = placedMarkers.value.splice(clickedMarkerIdx, 1)[0];
+                ElementPlus.ElMessage.info(`已擦除点位【${removed.point_name}】标注`);
+                redrawCanvas();
+                return;
+              }
+
+              drawnStrokes.value = drawnStrokes.value.filter(s => {
+                return !s.points.some(p => Math.hypot(p.x - pos.x, p.y - pos.y) <= 15);
+              });
+              redrawCanvas();
+            }
+          };
+
+          const handleCanvasMouseMove = (e) => {
+            if (!isCanvasDrawing || canvasMode.value !== 'pen' || !currentCanvasStroke) return;
+            const pos = getCanvasRelativePos(e);
+            currentCanvasStroke.points.push(pos);
+            redrawCanvas();
+          };
+
+          const handleCanvasMouseUp = () => {
+            if (isCanvasDrawing && currentCanvasStroke) {
+              canvasHistory.value.push({ type: 'stroke', stroke: currentCanvasStroke });
+              isCanvasDrawing = false;
+              currentCanvasStroke = null;
+            }
+          };
+
+          const handleCanvasMouseLeave = () => {
+            handleCanvasMouseUp();
+          };
+
+          // 上传底图
+          const handleUploadBgImage = (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const img = new Image();
+              img.onload = () => {
+                canvasBgImage.value = img;
+                canvasBgUrl.value = event.target.result;
+                redrawCanvas();
+                ElementPlus.ElMessage.success(`现场底图【${file.name}】上传成功，已自适应画布！`);
+              };
+              img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+          };
+
+          // 空白画布
+          const setBlankCanvas = () => {
+            canvasBgImage.value = null;
+            canvasBgUrl.value = '';
+            redrawCanvas();
+            ElementPlus.ElMessage.info('已恢复为标准坐标网格空白画布');
+          };
+
+          // 撤销上一步
+          const undoCanvas = () => {
+            if (canvasHistory.value.length === 0) {
+              ElementPlus.ElMessage.info('没有可撤销的画笔操作或标点');
+              return;
+            }
+            const last = canvasHistory.value.pop();
+            if (last.type === 'marker') {
+              const idx = placedMarkers.value.findIndex(m => m.id === last.marker.id);
+              if (idx >= 0) placedMarkers.value.splice(idx, 1);
+            } else if (last.type === 'stroke') {
+              const idx = drawnStrokes.value.indexOf(last.stroke);
+              if (idx >= 0) drawnStrokes.value.splice(idx, 1);
+            }
+            redrawCanvas();
+            ElementPlus.ElMessage.info('已撤销上一步操作');
+          };
+
+          // 清空全部
+          const clearCanvas = async () => {
+            try {
+              await ElementPlus.ElMessageBox.confirm('确定清空全部画笔笔触和已标注点位吗？', '清空提示', {
+                confirmButtonText: '确定清空',
+                cancelButtonText: '取消',
+                type: 'warning'
+              });
+              placedMarkers.value = [];
+              drawnStrokes.value = [];
+              canvasHistory.value = [];
+              redrawCanvas();
+              ElementPlus.ElMessage.success('画布已全部清空！');
+            } catch (e) {}
+          };
+
+          // ==========================================
+          // 数据加载、暂存草稿与同意流转
+          // ==========================================
+          const loadSamplingPrepData = async (taskId) => {
+            try {
+              // 1. 获取预置资源 (仪器、车辆、人员、规范)
+              const presetRes = await fetch('/api/sampling/presets');
+              const presetData = await presetRes.json();
+              if (presetData.code === 0 && presetData.data) {
+                presetInstruments.value = presetData.data.instruments || [];
+                presetVehicles.value = presetData.data.vehicles || [];
+                presetPersonnel.value = presetData.data.personnel || [];
+                presetRules.value = presetData.data.rules || [];
+              }
+
+              // 2. 获取任务准备数据
+              const prepRes = await fetch(`/api/sampling/preparation/${taskId}`);
+              const prepData = await prepRes.json();
+              if (prepData.code === 0 && prepData.data) {
+                const d = prepData.data;
+                samplingPrepForm.start_time = d.start_time || '2026-10-08 08:30:00';
+                samplingPrepForm.end_time = d.end_time || '2026-10-08 17:30:00';
+                samplingPrepForm.remark = d.remark || '';
+                samplingPrepForm.rule_name = d.rule_name || '《地表水和污水监测技术规范 HJ 91.1-2019》';
+                samplingPrepForm.instruments = d.instruments && d.instruments.length > 0 ? d.instruments : (presetInstruments.value.slice(0, 2));
+                samplingPrepForm.vehicles = d.vehicles && d.vehicles.length > 0 ? d.vehicles : (presetVehicles.value.slice(0, 1));
+                samplingPrepForm.personnel = d.personnel && d.personnel.length > 0 ? d.personnel : (presetPersonnel.value.slice(0, 2));
+                samplingPrepForm.bottles_preview = d.bottles_preview || [];
+                samplingPointsList.value = d.points_list || [];
+
+                // 画布历史恢复
+                if (d.canvas_data) {
+                  placedMarkers.value = d.canvas_data.markers || [];
+                  drawnStrokes.value = d.canvas_data.strokes || [];
+                  if (d.canvas_data.bg_image) {
+                    const img = new Image();
+                    img.onload = () => {
+                      canvasBgImage.value = img;
+                      canvasBgUrl.value = d.canvas_data.bg_image;
+                      redrawCanvas();
+                    };
+                    img.src = d.canvas_data.bg_image;
+                  }
+                }
+              }
+
+              nextTick(() => {
+                redrawCanvas();
+              });
+            } catch (e) {
+              console.error('加载采样前准备数据异常:', e);
+            }
+          };
+
+          // 暂存草稿
+          const saveSamplingPrepDraft = async () => {
+            if (!currentAuditTask.value || !currentAuditTask.value.id) return;
+            try {
+              const canvasData = {
+                markers: placedMarkers.value,
+                strokes: drawnStrokes.value,
+                bg_image: canvasBgUrl.value || ''
+              };
+
+              const payload = {
+                start_time: samplingPrepForm.start_time,
+                end_time: samplingPrepForm.end_time,
+                remark: samplingPrepForm.remark,
+                rule_name: samplingPrepForm.rule_name,
+                instruments: samplingPrepForm.instruments,
+                vehicles: samplingPrepForm.vehicles,
+                personnel: samplingPrepForm.personnel,
+                canvas_data: canvasData,
+                bottles_preview: samplingPrepForm.bottles_preview,
+                status: '已暂存'
+              };
+
+              const res = await fetch(`/api/sampling/preparation/${currentAuditTask.value.id}/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const data = await res.json();
+              if (data.code === 0) {
+                ElementPlus.ElMessage.success('采样前准备数据与点位图已成功暂存！');
+              } else {
+                ElementPlus.ElMessage.error(data.msg || '暂存失败');
+              }
+            } catch (e) {
+              ElementPlus.ElMessage.error('网络请求异常，暂存失败');
+            }
+          };
+
+          // 同意并推进至【现场确认方案】
+          const submitSamplingPrepApprove = async () => {
+            if (!currentAuditTask.value || !currentAuditTask.value.id) return;
+
+            // 1. 必填项严格校验：采样时间、仪器、人员
+            if (!samplingPrepForm.start_time || !samplingPrepForm.end_time) {
+              ElementPlus.ElMessage.error('【采样开始时间】与【采样结束时间】为必填项，请在第二栏完整选择！');
+              return;
+            }
+            if (new Date(samplingPrepForm.end_time) <= new Date(samplingPrepForm.start_time)) {
+              ElementPlus.ElMessage.error('【采样结束时间】必须晚于【采样开始时间】，请核验起止时间！');
+              return;
+            }
+            if (!samplingPrepForm.instruments || samplingPrepForm.instruments.length === 0) {
+              ElementPlus.ElMessage.error('【检测仪器】为必填项，请在第三栏添加至少 1 台检测仪器！');
+              return;
+            }
+            if (!samplingPrepForm.personnel || samplingPrepForm.personnel.length === 0) {
+              ElementPlus.ElMessage.error('【人员管理】为必填项，请在第四栏添加至少 1 名采样人员！');
+              return;
+            }
+            const hasLeader = samplingPrepForm.personnel.some(p => p.is_leader || p.role === '采样队长');
+            if (!hasLeader) {
+              ElementPlus.ElMessage.error('【人员管理】中必须指定至少 1 名【采样队长】，请核对队员身份！');
+              return;
+            }
+
+            try {
+              await ElementPlus.ElMessageBox.confirm(
+                `确认完成【采样前准备】并同意流转至下一节点【现场确认方案】吗？\n本次指派：采样时间（${samplingPrepForm.start_time} ~ ${samplingPrepForm.end_time}）、${samplingPrepForm.instruments.length}台检测仪器、${samplingPrepForm.personnel.length}名采样人员。`,
+                '采样准备审批流转确认',
+                {
+                  confirmButtonText: '✅ 确认同意并流转',
+                  cancelButtonText: '取消',
+                  type: 'success'
+                }
+              );
+
+              const canvasData = {
+                markers: placedMarkers.value,
+                strokes: drawnStrokes.value,
+                bg_image: canvasBgUrl.value || ''
+              };
+
+              const payload = {
+                action: '同意',
+                audit_comment: auditSubmitForm.comment || `同意采样前准备方案，人员、仪器与车辆已齐备，准予开展现场采样并推进至【现场确认方案】节点`,
+                handler: '超级管理员',
+                sampling_prep_data: {
+                  start_time: samplingPrepForm.start_time,
+                  end_time: samplingPrepForm.end_time,
+                  remark: samplingPrepForm.remark,
+                  rule_name: samplingPrepForm.rule_name,
+                  instruments: samplingPrepForm.instruments,
+                  vehicles: samplingPrepForm.vehicles,
+                  personnel: samplingPrepForm.personnel,
+                  canvas_data: canvasData,
+                  bottles_preview: samplingPrepForm.bottles_preview
+                }
+              };
+
+              const res = await fetch(`/api/audit/task/${currentAuditTask.value.id}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const data = await res.json();
+              if (data.code === 0) {
+                ElementPlus.ElMessage.success('采样前准备完成并同意！任务已成功流转至【现场确认方案】节点！');
+                const detailRes = await fetch(`/api/audit/task/${currentAuditTask.value.id}/detail`);
+                const detailData = await detailRes.json();
+                if (detailData.code === 0 && detailData.data) {
+                  currentAuditTask.value = detailData.data.task || currentAuditTask.value;
+                }
+                loadAuditTaskList();
+                loadStats();
+              } else {
+                ElementPlus.ElMessage.error(data.msg || '审批提交失败');
+              }
+            } catch (e) {
+              if (e !== 'cancel') {
+                ElementPlus.ElMessage.error('审批流转异常：' + e);
+              }
+            }
+          };
+
           // 附件预览与下载模拟
           const handlePreviewAttachment = (file) => {
             ElementPlus.ElMessage.info(`正在在线解析并预览附件: ${file.name}`);
@@ -4635,7 +5921,13 @@
 
           const handleMenuSelect = (index) => {
             const title = menuTitleMap[index] || index;
-            if (index === 'task-my-audit') {
+            if (index === 'sampling-prepare') {
+              activeTab.value = 'task-my-audit';
+              auditFilter.current_node = '采样前准备';
+              loadAuditTaskList();
+              ElementPlus.ElMessage.info('已为您切换至【我的审批任务 - 采样前准备】节点列表');
+              return;
+            } else if (index === 'task-my-audit') {
               activeTab.value = 'task-my-audit';
               handleTabSwitch('task-my-audit');
               ElementPlus.ElMessage.info(`切换至: ${title}`);
@@ -5073,6 +6365,53 @@
             saveAuditContractDetailOnly,
             recalcAuditContractAmount,
             recalcAuditTaxAmount,
+            // 采样前准备工作台相关
+            samplingPrepForm,
+            samplingPointsList,
+            presetInstruments,
+            presetVehicles,
+            presetPersonnel,
+            presetRules,
+            addInstrumentDialogVisible,
+            addVehicleDialogVisible,
+            addPersonnelDialogVisible,
+            instrumentSearch,
+            filteredPresetInstruments,
+            selectedPresetInstruments,
+            handleFilterInstruments,
+            handleResetInstrumentSearch,
+            handleInstrumentSelectionChange,
+            openAddInstrumentDialog,
+            confirmAddInstruments,
+            removeInstrument,
+            openAddVehicleDialog,
+            addVehicleFromPreset,
+            removeVehicle,
+            openAddPersonnelDialog,
+            addPersonnelFromPreset,
+            handleRoleChange,
+            removePersonnel,
+            samplingCanvasRef,
+            canvasBgInput,
+            canvasMode,
+            activePointToPlace,
+            penWidth,
+            penColor,
+            placedMarkers,
+            drawnStrokes,
+            isPointPlaced,
+            selectPointForMarker,
+            handleCanvasMouseDown,
+            handleCanvasMouseMove,
+            handleCanvasMouseUp,
+            handleCanvasMouseLeave,
+            handleUploadBgImage,
+            setBlankCanvas,
+            undoCanvas,
+            clearCanvas,
+            loadSamplingPrepData,
+            saveSamplingPrepDraft,
+            submitSamplingPrepApprove,
             // 监测方案与配置项目
             schemeDialogVisible,
             configItemsDialogVisible,

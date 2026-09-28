@@ -594,5 +594,48 @@ def init_db():
         db.add_all([a1, a2, a3, a4])
         db.commit()
 
+    # 确保存在一个处于【采样前准备】节点的审批任务供测试与操作
+    sample_prep_task = db.query(LimsAuditTask).filter(LimsAuditTask.current_node == "采样前准备").first()
+    if not sample_prep_task:
+        c1 = db.query(LimsContract).first()
+        c1_id = c1.id if c1 else 1
+        a_sampling = LimsAuditTask(
+            business_code="WT-20260920005",
+            business_type="采样任务实施",
+            business_name="江苏恒瑞医药 - 厂区综合污水排放口及雨水管网月度常规采样与排污检测",
+            applicant="超级管理员",
+            applicant_dept="现场采样工程部",
+            current_node="采样前准备",
+            current_handler="超级管理员",
+            is_finished="否",
+            audit_result="待处理",
+            contract_id=c1_id,
+            attachment_info=json.dumps([
+                {"name": "恒瑞医药排污口现场平面布置图.png", "size": "3.1 MB", "time": "2026-09-20 09:10", "uploader": "超级管理员"},
+                {"name": "采样任务下达通知书及安全须知.pdf", "size": "1.5 MB", "time": "2026-09-20 09:15", "uploader": "超级管理员"}
+            ], ensure_ascii=False),
+            audit_history=json.dumps([
+                {
+                    "node_name": "委托下单",
+                    "operator": "超级管理员",
+                    "action": "提交采样",
+                    "operate_time": "2026-09-20 09:20:00",
+                    "completion_status": "已完成",
+                    "comment": "委托下单完成，正式下达采样实施任务，进入采样前准备"
+                },
+                {
+                    "node_name": "采样前准备",
+                    "operator": "超级管理员",
+                    "action": "待处理",
+                    "operate_time": "-",
+                    "completion_status": "处理中",
+                    "comment": "请指派采样起止时间、调度检测仪器、分配车辆与采样人员、在线绘制点位图并预览分瓶方案"
+                }
+            ], ensure_ascii=False)
+        )
+        db.add(a_sampling)
+        db.commit()
+
     db.close()
     print("[*] LIMS 核心数据库与初始演示数据初始化完成！")
+

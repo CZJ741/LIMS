@@ -233,6 +233,8 @@ class AuditTaskApprove(BaseModel):
     audit_comment: Optional[str] = "同意"
     handler: Optional[str] = "超级管理员"
     contract_data: Optional[Any] = None  # 支持在合同录入节点同时提交修改后的合同细节及监测方案
+    sampling_prep_data: Optional[Any] = None # 支持在采样前准备节点提交采样配置数据
+
 
 
 class AuditTaskOut(AuditTaskCreate):
@@ -241,6 +243,30 @@ class AuditTaskOut(AuditTaskCreate):
     audit_time: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+# 采样前准备模型
+class SamplingPreparationSave(BaseModel):
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    remark: Optional[str] = ""
+    rule_name: Optional[str] = "《地表水和污水监测技术规范 HJ 91.1-2019》"
+    instruments: Optional[List[Any]] = []
+    vehicles: Optional[List[Any]] = []
+    personnel: Optional[List[Any]] = []
+    canvas_data: Optional[Any] = None
+    bottles_preview: Optional[List[Any]] = []
+    status: Optional[str] = "已保存"
+
+class SamplingPreparationOut(SamplingPreparationSave):
+    id: Optional[int] = None
+    audit_task_id: int
+    contract_id: Optional[int] = None
+    entrust_id: Optional[int] = None
+    create_time: Optional[datetime] = None
+    update_time: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
 
 
 

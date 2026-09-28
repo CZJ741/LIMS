@@ -236,5 +236,28 @@ class LimsAuditTask(Base):
     audit_time = Column(DateTime, nullable=True)                                # 审核处理时间
 
 
+# 业务表：采样前准备信息 (Pre-sampling Preparation)
+class LimsSamplingPreparation(Base):
+    __tablename__ = "lims_sampling_preparation"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    audit_task_id = Column(Integer, index=True, nullable=False)                 # 关联审批任务 ID
+    contract_id = Column(Integer, nullable=True)                                # 关联合同 ID
+    entrust_id = Column(Integer, nullable=True)                                 # 关联委托单 ID
+    start_time = Column(String(50), nullable=True)                              # 采样开始时间
+    end_time = Column(String(50), nullable=True)                                # 采样结束时间
+    remark = Column(Text, nullable=True)                                        # 采样前准备备注
+    rule_name = Column(String(200), default="《地表水和污水监测技术规范 HJ 91.1-2019》") # 所选采样规则
+    instruments_json = Column(Text, nullable=True)                              # 所选仪器列表 JSON
+    vehicles_json = Column(Text, nullable=True)                                 # 车辆调度 JSON
+    personnel_json = Column(Text, nullable=True)                                # 人员调度 JSON (含是否队长)
+    canvas_data_json = Column(Text, nullable=True)                             # 点位图 Canvas 绘制数据与标点 JSON
+    bottles_preview_json = Column(Text, nullable=True)                          # 分瓶预览方案 JSON
+    status = Column(String(50), default="已保存")                               # 状态：草稿 / 已保存 / 已完成
+    create_time = Column(DateTime, default=datetime.utcnow)
+    update_time = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+
 
 

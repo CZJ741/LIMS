@@ -1,6 +1,6 @@
 <template>
   <el-container class="layout-container">
-    <el-aside width="220px" class="aside">
+    <el-aside width="240px" class="aside">
       <div class="logo-box">
         <h3>环境检测 LIMS</h3>
       </div>
@@ -8,40 +8,68 @@
         :default-active="activeRoute"
         class="el-menu-vertical"
         router
+        unique-opened
         background-color="#304156"
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
+        <!-- 工作台首页 -->
         <el-menu-item index="/dashboard">
           <el-icon><Odometer /></el-icon>
           <span>工作台首页</span>
         </el-menu-item>
-        <el-menu-item index="/contract">
-          <el-icon><DocumentChecked /></el-icon>
-          <span>合同评审</span>
-        </el-menu-item>
-        <el-menu-item index="/entrust">
-          <el-icon><Tickets /></el-icon>
-          <span>委托单受理</span>
-        </el-menu-item>
-        <el-menu-item index="/sampling">
-          <el-icon><Location /></el-icon>
-          <span>现场采样交接</span>
-        </el-menu-item>
-        <el-menu-item index="/laboratory">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>实验检测录入</span>
-        </el-menu-item>
-        <el-menu-item index="/report">
-          <el-icon><Files /></el-icon>
-          <span>报告签发归档</span>
-        </el-menu-item>
+
+        <!-- 系统管理 -->
+        <el-sub-menu index="/system">
+          <template #title>
+            <el-icon><Setting /></el-icon>
+            <span>系统管理</span>
+          </template>
+
+          <!-- 权限管理 -->
+          <el-sub-menu index="/system/permission">
+            <template #title>
+              <el-icon><Lock /></el-icon>
+              <span>权限管理</span>
+            </template>
+
+            <!-- 组织管理 (包含: 组织维护、人员维护、角色管理、职位维护) -->
+            <el-sub-menu index="/system/permission/org">
+              <template #title>
+                <el-icon><OfficeBuilding /></el-icon>
+                <span>组织管理</span>
+              </template>
+              <el-menu-item index="/system/permission/org/dept">
+                <el-icon><Folder /></el-icon>
+                <span>组织维护</span>
+              </el-menu-item>
+              <el-menu-item index="/system/permission/org/user-org">
+                <el-icon><UserFilled /></el-icon>
+                <span>人员维护</span>
+              </el-menu-item>
+              <el-menu-item index="/system/permission/org/role">
+                <el-icon><Stamp /></el-icon>
+                <span>角色管理</span>
+              </el-menu-item>
+              <el-menu-item index="/system/permission/org/position">
+                <el-icon><Postcard /></el-icon>
+                <span>职位维护</span>
+              </el-menu-item>
+            </el-sub-menu>
+
+            <!-- 用户管理 -->
+            <el-menu-item index="/system/permission/user">
+              <el-icon><User /></el-icon>
+              <span>用户管理</span>
+            </el-menu-item>
+          </el-sub-menu>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
     <el-container>
       <el-header class="header">
         <div class="header-left">
-          <span>检验检测机构资质认定 (CMA/CNAS) 全生命周期合规管理</span>
+          <span>检验检测机构资质认定 (CMA/CNAS) 管理平台</span>
         </div>
         <div class="header-right">
           <el-dropdown @command="handleCommand">
@@ -70,11 +98,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   Odometer,
-  Tickets,
-  DocumentChecked,
-  Location,
-  DataAnalysis,
-  Files,
+  Setting,
+  Lock,
+  OfficeBuilding,
+  Folder,
+  UserFilled,
+  Stamp,
+  Postcard,
+  User,
   ArrowDown
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -113,6 +144,7 @@ const handleCommand = (command: string) => {
 .aside {
   background-color: #304156;
   color: #fff;
+  transition: width 0.3s;
 }
 .logo-box {
   height: 60px;
@@ -124,6 +156,7 @@ const handleCommand = (command: string) => {
   margin: 0;
   font-size: 16px;
   color: #fff;
+  font-weight: 600;
 }
 .header {
   height: 60px;
@@ -132,6 +165,7 @@ const handleCommand = (command: string) => {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
+  background-color: #ffffff;
 }
 .header-left {
   font-size: 14px;

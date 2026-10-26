@@ -17,7 +17,7 @@
           <span>工作台首页</span>
         </el-menu-item>
         <el-menu-item index="/contract">
-          <el-icon><DocumentCheck /></el-icon>
+          <el-icon><DocumentChecked /></el-icon>
           <span>合同评审</span>
         </el-menu-item>
         <el-menu-item index="/entrust">
@@ -71,7 +71,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   Odometer,
   Tickets,
-  DocumentCheck,
+  DocumentChecked,
   Location,
   DataAnalysis,
   Files,

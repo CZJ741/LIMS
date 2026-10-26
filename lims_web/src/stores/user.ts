@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-2import { ref } from 'vue'
+import { ref } from 'vue'
 
 export interface UserInfo {
   username: string

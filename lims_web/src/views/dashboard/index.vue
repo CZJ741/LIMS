@@ -76,7 +76,7 @@ import {
   Menu,
   EditPen,
   Stamp,
-  DocumentCheck,
+  DocumentChecked,
   Tickets,
   Location,
   DataAnalysis,
@@ -90,7 +90,7 @@ const quickActions = [
     name: '合同评审',
     desc: '检测方案与报价审批',
     path: '/contract',
-    icon: DocumentCheck,
+    icon: DocumentChecked,
     color: '#409EFF'
   },
   {

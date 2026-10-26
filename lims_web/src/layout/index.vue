@@ -12,6 +12,10 @@
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
+        <el-menu-item index="/dashboard">
+          <el-icon><Odometer /></el-icon>
+          <span>工作台首页</span>
+        </el-menu-item>
         <el-menu-item index="/contract">
           <el-icon><DocumentCheck /></el-icon>
           <span>合同评审</span>
@@ -40,14 +44,14 @@
           <span>检验检测机构资质认定 (CMA/CNAS) 全生命周期合规管理</span>
         </div>
         <div class="header-right">
-          <el-dropdown>
+          <el-dropdown @command="handleCommand">
             <span class="user-dropdown">
-              检测业务员 (管理员) <el-icon><ArrowDown /></el-icon>
+              {{ displayName }} <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>个人中心与签名</el-dropdown-item>
-                <el-dropdown-item divided>退出登录</el-dropdown-item>
+                <el-dropdown-item command="profile">个人中心与签名</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -62,8 +66,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import {
+  Odometer,
   Tickets,
   DocumentCheck,
   Location,
@@ -71,9 +77,33 @@ import {
   Files,
   ArrowDown
 } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+
 const activeRoute = computed(() => route.path)
+
+const displayName = computed(() => {
+  return userStore.userInfo?.realName
+    ? `${userStore.userInfo.realName} (${userStore.userInfo.role})`
+    : '系统管理员 (ADMIN)'
+})
+
+const handleCommand = (command: string) => {
+  if (command === 'logout') {
+    ElMessageBox.confirm('确定要退出系统吗？', '提示', {
+      confirmButtonText: '确定退出',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(() => {
+      userStore.logout()
+      ElMessage.success('已安全退出登录')
+      router.push('/login')
+    }).catch(() => {})
+  }
+}
 </script>
 
 <style scoped>

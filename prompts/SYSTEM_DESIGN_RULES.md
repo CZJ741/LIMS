@@ -42,3 +42,42 @@
 
 3. **类型与 API 封装**：
    - 所有接口调用统一通过 `api/<domain>.ts` 导出，并配有完整的 TypeScript 接口与入参/出参类型声明。
+
+4. **UI 视觉与组件风格基线（以人员维护 user-org.vue 为标准）**：
+   - **页面底色与间距**：列表页面使用白底容器（`background: #fff; padding: 12px 16px; min-height: calc(100vh - 90px);`）。
+   - **顶部检索区**：使用 `search-panel` 浅灰微边框面板（`background: #fafafa; border: 1px solid #ebeef5; padding: 10px 12px 2px 12px;`），紧凑排布，检索项间距保持整齐。
+   - **品牌主色调与按钮规范**：
+     - 主色调采用稳重青绿色：`#009688`。
+     - 工具栏主要操作按钮（如新增、导出、批量）：统一使用 `.tool-btn`（`background-color: #009688; border-color: #009688; color: #fff; border-radius: 3px; font-size: 13px; padding: 6px 14px;`）。
+     - 搜索按钮 `.btn-search` 保持与主色调一致（`#009688`），重置按钮 `.btn-reset` 保持白底微边框。
+   - **表格内操作按钮**：
+     - 统一采用轻量徽章式描边微型按钮 `.op-btn`（`padding: 2px 6px; font-size: 12px; border: 1px solid #dcdfe6; border-radius: 3px;`）。
+     - **严格单行排布要求**：操作列宽度（`width`）必须充足（3个按钮时建议 `width="200"`），并设置 `.op-group { display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 4px; white-space: nowrap; }`，严禁按钮换行/折行。
+     - 编辑/查看操作 `.op-view`：`color: #009688; border-color: #009688;`。
+     - 权限/次级操作 `.op-auth`：`color: #e6a23c; border-color: #e6a23c;`。
+     - 删除/危险操作 `.op-del`：`color: #f56c6c; border-color: #f56c6c;`。
+
+---
+
+## 三、 异常与错误直观透传强制规范（前后端一体化）
+
+1. **后端全局异常拦截与规范转换**：
+   - 必须配置全局 `EXCEPTION_HANDLER`（如 `common.exceptions.custom_exception_handler`），将 DRF `ValidationError`（字典/列表型字段错误）及其他异常统一提取并转换为扁平通俗的 `message` 字段。
+   - 唯一性校验（如人员编码、角色编码、角色名称重复等），必须在 Serializer/View 显式抛出明确的业务报错文本（例：`人员编码【XXX】已存在，请勿重复输入`）。
+
+2. **前端 Axios 响应拦截与递归解析**：
+   - 前端拦截器（`request.ts`）在捕获 HTTP 4xx/5xx 响应时，必须执行智能递归解析（提取 `data.message`、`data.detail` 或字段字典中的第一个/全部具体文本）。
+   - 禁止在未深度解析错误响应体前直接回退显示默认模糊提示，必须将后端原始的具体错误文本通过 `ElMessage.error()` 真实直观呈现给前端操作者，杜绝笼统的“网络请求错误”。
+
+---
+
+## 四、 复杂密集表单校验体验规范（方案2：全局消息汇总 + 自动滚动聚焦）
+
+在多列栅格密集表单中，由于单项下边距紧凑或提示文本折行，Element Plus 原生的绝对定位错误提示易发生被遮挡或视线丢失。本项目统一执行以下标准：
+
+1. **自动滚动定位**：所有 `<el-form>` 必须添加 `scroll-to-error` 属性，确保校验失败时视口平滑居中到首个未填/错误输入框。
+2. **关闭行内浮动红字**：在 `<el-form>` 上统一配置 `:show-message="false"`（辅以 CSS `:deep(.el-form-item__error) { display: none !important; }`），彻底消除被邻近输入框遮挡截断的行内红字，同时输入框仍保留红色边框高亮（`.is-error` 状态）提示。
+3. **全局错误汇总告知**：表单 `validate` 失败回调中，必须通过 `fields` 提取未通过字段的人性化名称，使用 `ElMessage.warning()` 顶部全局弹出醒目警示（例：`请完善必填或格式错误信息：【人员编码、所属部门】未通过校验，已自动定位至首个待办项`），避免用户在大量输入框中逐行寻找。
+
+
+

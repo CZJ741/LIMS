@@ -14,51 +14,51 @@
         active-text-color="#409EFF"
       >
         <!-- 工作台首页 -->
-        <el-menu-item index="/dashboard">
+        <el-menu-item v-if="hasMenuPermission('/dashboard')" index="/dashboard">
           <el-icon><Odometer /></el-icon>
           <span>工作台首页</span>
         </el-menu-item>
 
         <!-- 系统管理 -->
-        <el-sub-menu index="/system">
+        <el-sub-menu v-if="hasMenuPermission('/system')" index="/system">
           <template #title>
             <el-icon><Setting /></el-icon>
             <span>系统管理</span>
           </template>
 
           <!-- 权限管理 -->
-          <el-sub-menu index="/system/permission">
+          <el-sub-menu v-if="hasMenuPermission('/system/permission')" index="/system/permission">
             <template #title>
               <el-icon><Lock /></el-icon>
               <span>权限管理</span>
             </template>
 
             <!-- 组织管理 (包含: 组织维护、人员维护、角色管理、职位维护) -->
-            <el-sub-menu index="/system/permission/org">
+            <el-sub-menu v-if="hasMenuPermission('/system/permission/org')" index="/system/permission/org">
               <template #title>
                 <el-icon><OfficeBuilding /></el-icon>
                 <span>组织管理</span>
               </template>
-              <el-menu-item index="/system/permission/org/dept">
+              <el-menu-item v-if="hasMenuPermission('/system/permission/org/dept')" index="/system/permission/org/dept">
                 <el-icon><Folder /></el-icon>
                 <span>组织维护</span>
               </el-menu-item>
-              <el-menu-item index="/system/permission/org/user-org">
+              <el-menu-item v-if="hasMenuPermission('/system/permission/org/user-org')" index="/system/permission/org/user-org">
                 <el-icon><UserFilled /></el-icon>
                 <span>人员维护</span>
               </el-menu-item>
-              <el-menu-item index="/system/permission/org/role">
+              <el-menu-item v-if="hasMenuPermission('/system/permission/org/role')" index="/system/permission/org/role">
                 <el-icon><Stamp /></el-icon>
                 <span>角色管理</span>
               </el-menu-item>
-              <el-menu-item index="/system/permission/org/position">
+              <el-menu-item v-if="hasMenuPermission('/system/permission/org/position')" index="/system/permission/org/position">
                 <el-icon><Postcard /></el-icon>
                 <span>职位维护</span>
               </el-menu-item>
             </el-sub-menu>
 
             <!-- 用户管理 -->
-            <el-menu-item index="/system/permission/user">
+            <el-menu-item v-if="hasMenuPermission('/system/permission/user')" index="/system/permission/user">
               <el-icon><User /></el-icon>
               <span>用户管理</span>
             </el-menu-item>
@@ -72,9 +72,47 @@
           <span>检验检测机构资质认定 (CMA/CNAS) 管理平台</span>
         </div>
         <div class="header-right">
+          <!-- 职位切换控件 -->
+          <div class="role-switcher-wrap">
+            <template v-if="userRoles.length > 1">
+              <el-dropdown trigger="click" @command="handleRoleSwitch">
+                <span class="role-badge active-cursor">
+                  <span class="role-label">当前执业身份：</span>
+                  <span class="role-name">{{ currentActiveRoleName }}</span>
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu class="role-dropdown-menu">
+                    <div class="role-menu-title">切换工作身份（影响菜单与权限）</div>
+                    <el-dropdown-item
+                      v-for="r in userRoles"
+                      :key="r.id"
+                      :command="r.id"
+                      :class="{ 'is-active-role': r.id === currentActiveRoleId }"
+                    >
+                      <div class="role-menu-item">
+                        <span>{{ r.name }} ({{ r.code }})</span>
+                        <span v-if="r.id === currentActiveRoleId" class="current-check">✓ 当前</span>
+                      </div>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+            <template v-else>
+              <span class="role-badge">
+                <span class="role-label">当前身份：</span>
+                <span class="role-name">{{ currentActiveRoleName }}</span>
+              </span>
+            </template>
+          </div>
+
+          <!-- 用户信息与退出登录 -->
           <el-dropdown @command="handleCommand">
             <span class="user-dropdown">
-              {{ displayName }} <el-icon><ArrowDown /></el-icon>
+              <el-icon><User /></el-icon>
+              <span>{{ realName }}</span>
+              <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -116,11 +154,52 @@ const userStore = useUserStore()
 
 const activeRoute = computed(() => route.path)
 
-const displayName = computed(() => {
-  return userStore.userInfo?.realName
-    ? `${userStore.userInfo.realName} (${userStore.userInfo.role})`
-    : '系统管理员 (ADMIN)'
+const isSuperAdmin = computed(() => {
+  const info = userStore.userInfo
+  if (!info) return false
+  if (info.username === 'admin') return true
+  if (info.activeRoleCode === 'ADMIN') return true
+  return false
 })
+
+const userRoles = computed(() => {
+  return userStore.userInfo?.roles || []
+})
+
+const currentActiveRoleId = computed(() => {
+  return userStore.userInfo?.activeRoleId
+})
+
+const currentActiveRoleName = computed(() => {
+  return userStore.userInfo?.activeRoleName || (isSuperAdmin.value ? '超级管理员' : '暂无职位')
+})
+
+const realName = computed(() => {
+  return userStore.userInfo?.realName || userStore.userInfo?.username || '用户'
+})
+
+const userPermissions = computed(() => {
+  return userStore.userInfo?.permissions || []
+})
+
+const hasMenuPermission = (menuPath: string) => {
+  if (isSuperAdmin.value) return true
+  const perms = userPermissions.value
+  // 如果拥有该菜单的具体权限或包含其子路由权限
+  return perms.some((p) => p === menuPath || p.startsWith(menuPath + '/'))
+}
+
+const handleRoleSwitch = (roleId: string) => {
+  if (roleId === currentActiveRoleId.value) return
+  const success = userStore.switchRole(roleId)
+  if (success) {
+    ElMessage.success(`已切换工作身份为【${currentActiveRoleName.value}】`)
+    // 切换身份后，检查当前路由是否仍拥有访问权限；若无权限则平滑导航回工作台首页
+    if (!hasMenuPermission(route.path)) {
+      router.push('/dashboard')
+    }
+  }
+}
 
 const handleCommand = (command: string) => {
   if (command === 'logout') {
@@ -170,6 +249,66 @@ const handleCommand = (command: string) => {
 .header-left {
   font-size: 14px;
   color: #606266;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.role-switcher-wrap {
+  display: flex;
+  align-items: center;
+}
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #f0f7f5;
+  border: 1px solid #b2dfdb;
+  color: #00796b;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.role-badge.active-cursor {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.role-badge.active-cursor:hover {
+  background: #e0f2f1;
+  border-color: #009688;
+}
+.role-label {
+  color: #606266;
+  margin-right: 2px;
+}
+.role-name {
+  font-weight: 600;
+  color: #009688;
+}
+.role-menu-title {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #909399;
+  border-bottom: 1px solid #f0f2f5;
+  margin-bottom: 4px;
+}
+.role-menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-width: 170px;
+  gap: 12px;
+}
+.current-check {
+  color: #009688;
+  font-size: 12px;
+  font-weight: bold;
+}
+.is-active-role {
+  color: #009688 !important;
+  background-color: #f0f9f8;
+  font-weight: 500;
 }
 .user-dropdown {
   cursor: pointer;

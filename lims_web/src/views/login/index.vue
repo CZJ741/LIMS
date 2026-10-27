@@ -57,6 +57,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import request from '@/utils/request'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -76,26 +77,73 @@ const rules: FormRules = {
 
 const handleLogin = async () => {
   if (!formRef.value) return
-  await formRef.value.validate((valid) => {
+  await formRef.value.validate(async (valid) => {
     if (!valid) return
     loading.value = true
+    try {
+      const res: any = await request({
+        url: '/auth/login/',
+        method: 'post',
+        data: {
+          username: form.username,
+          password: form.password
+        }
+      })
+      const access = res.data?.access
+      const user = res.data?.user
+      if (access) {
+        // 解析角色列表并设定初始默认激活的角色
+        const rawRoles = user?.roles || []
+        const userRoles = rawRoles.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          code: r.code,
+          menu_permissions: r.menu_permissions || []
+        }))
 
-    // 默认超级管理员身份认证校验
-    setTimeout(() => {
-      loading.value = false
-      if (form.username === 'admin' && form.password === '123456') {
+        // 若用户是系统超级管理员或拥有 ADMIN 角色，优先激活 ADMIN，否则激活第一个可用角色
+        let defaultRole = userRoles.find((r: any) => r.code === 'ADMIN')
+        if (!defaultRole && userRoles.length > 0) {
+          defaultRole = userRoles[0]
+        }
+
+        let initialPermissions: string[] = []
+        if (user?.username === 'admin' || defaultRole?.code === 'ADMIN') {
+          initialPermissions = [
+            '/dashboard',
+            '/system',
+            '/system/permission',
+            '/system/permission/org',
+            '/system/permission/org/dept',
+            '/system/permission/org/user-org',
+            '/system/permission/org/role',
+            '/system/permission/org/position',
+            '/system/permission/user'
+          ]
+        } else if (defaultRole) {
+          initialPermissions = defaultRole.menu_permissions || ['/dashboard']
+        } else {
+          initialPermissions = ['/dashboard']
+        }
+
         userStore.login({
-          username: 'admin',
-          realName: '系统超级管理员',
-          role: 'ADMIN',
-          token: 'mock-admin-token-' + Date.now()
+          username: user?.username || form.username,
+          realName: user?.real_name || '系统用户',
+          token: access,
+          roles: userRoles,
+          activeRoleId: defaultRole?.id,
+          activeRoleName: defaultRole?.name || '普通人员',
+          activeRoleCode: defaultRole?.code || 'USER',
+          permissions: initialPermissions
         })
         ElMessage.success('登录成功，欢迎进入 LIMS 工作台')
         router.push('/dashboard')
-      } else {
-        ElMessage.error('用户名或密码错误，请核对后重试')
       }
-    }, 400)
+    } catch (err: any) {
+      // 错误已由拦截器处理
+    } finally {
+      loading.value = false
+    }
   })
 }
 </script>

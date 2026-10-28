@@ -84,6 +84,36 @@ const menuTreeData: MenuNode[] = [
     tag: '基础'
   },
   {
+    id: '/merchant',
+    label: '客商管理',
+    children: [
+      { id: '/merchant/customer', label: '客户基本信息' }
+    ]
+  },
+  {
+    id: '/contract',
+    label: '合同/委托协议管理',
+    children: [
+      { id: '/contract/contract-reg', label: '合同登记' },
+      { id: '/contract/entrust-reg', label: '委托协议登记' },
+      { id: '/contract/my-history', label: '我的历史合同/委托协议' },
+      { id: '/contract/summary', label: '合同/委托协议书汇总' },
+      { id: '/contract/approval', label: '合同/委托协议审批' },
+      { id: '/contract/package-maintain', label: '检测包维护' }
+    ]
+  },
+  {
+    id: '/entrust',
+    label: '委托单管理',
+    children: [
+      { id: '/entrust/no-quote-reg', label: '无报价任务登记' },
+      { id: '/entrust/quote-reg', label: '有报价任务登记' },
+      { id: '/entrust/order', label: '委托下单' },
+      { id: '/entrust/my-info', label: '我的委托单信息' },
+      { id: '/entrust/summary', label: '委托单汇总' }
+    ]
+  },
+  {
     id: '/system',
     label: '系统管理',
     children: [
@@ -97,8 +127,7 @@ const menuTreeData: MenuNode[] = [
             children: [
               { id: '/system/permission/org/dept', label: '组织维护' },
               { id: '/system/permission/org/user-org', label: '人员维护' },
-              { id: '/system/permission/org/role', label: '角色管理' },
-              { id: '/system/permission/org/position', label: '职位维护' }
+              { id: '/system/permission/org/role', label: '角色管理' }
             ]
           },
           { id: '/system/permission/user', label: '用户管理' }

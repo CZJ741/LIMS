@@ -32,9 +32,45 @@ class RoleSerializer(serializers.ModelSerializer):
         return value
 
 class DepartmentSerializer(serializers.ModelSerializer):
+    parent_name = serializers.CharField(source='parent.name', read_only=True)
+    org_type_display = serializers.CharField(source='get_org_type_display', read_only=True)
+    business_type_display = serializers.CharField(source='get_business_type_display', read_only=True)
+    children = serializers.SerializerMethodField()
+
     class Meta:
         model = Department
-        fields = ['id', 'name', 'code', 'description']
+        fields = [
+            'id', 'name', 'code', 'parent', 'parent_name',
+            'org_type', 'org_type_display',
+            'business_type', 'business_type_display',
+            'is_legal_person', 'company_name',
+            'sort_order', 'is_active', 'description',
+            'children', 'created_at'
+        ]
+
+    def get_children(self, obj):
+        # 仅在非嵌套序列化或单项时动态读取
+        children = obj.children.filter(is_active=True).order_by('sort_order', 'code')
+        if not children.exists():
+            return None
+        return DepartmentSerializer(children, many=True).data
+
+    def validate_code(self, value):
+        if not value:
+            raise serializers.ValidationError("单位编码不能为空")
+        qs = Department.objects.filter(code=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"单位编码【{value}】已存在，请勿重复输入")
+        return value
+
+    def validate(self, attrs):
+        parent = attrs.get('parent')
+        if self.instance and parent:
+            if parent.pk == self.instance.pk:
+                raise serializers.ValidationError({"parent": "上级单位不能选择当前单位本身"})
+        return attrs
 
 class UserInfoSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)

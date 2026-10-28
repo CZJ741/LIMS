@@ -19,6 +19,78 @@
           <span>工作台首页</span>
         </el-menu-item>
 
+        <!-- 客商管理 -->
+        <el-sub-menu v-if="hasMenuPermission('/merchant')" index="/merchant">
+          <template #title>
+            <el-icon><OfficeBuilding /></el-icon>
+            <span>客商管理</span>
+          </template>
+          <el-menu-item v-if="hasMenuPermission('/merchant/customer')" index="/merchant/customer">
+            <el-icon><User /></el-icon>
+            <span>客户基本信息</span>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 合同/委托协议管理 -->
+        <el-sub-menu v-if="hasMenuPermission('/contract')" index="/contract">
+          <template #title>
+            <el-icon><DocumentCopy /></el-icon>
+            <span>合同/委托协议管理</span>
+          </template>
+          <el-menu-item v-if="hasMenuPermission('/contract/contract-reg')" index="/contract/contract-reg">
+            <el-icon><List /></el-icon>
+            <span>合同登记</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/contract/entrust-reg')" index="/contract/entrust-reg">
+            <el-icon><Document /></el-icon>
+            <span>委托协议登记</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/contract/my-history')" index="/contract/my-history">
+            <el-icon><Tickets /></el-icon>
+            <span>我的历史合同/委托协议</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/contract/summary')" index="/contract/summary">
+            <el-icon><Collection /></el-icon>
+            <span>合同/委托协议书汇总</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/contract/approval')" index="/contract/approval">
+            <el-icon><Checked /></el-icon>
+            <span>合同/委托协议审批</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/contract/package-maintain')" index="/contract/package-maintain">
+            <el-icon><Goods /></el-icon>
+            <span>检测包维护</span>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 委托单管理 -->
+        <el-sub-menu v-if="hasMenuPermission('/entrust')" index="/entrust">
+          <template #title>
+            <el-icon><DocumentCopy /></el-icon>
+            <span>委托单管理</span>
+          </template>
+          <el-menu-item v-if="hasMenuPermission('/entrust/no-quote-reg')" index="/entrust/no-quote-reg">
+            <el-icon><Tickets /></el-icon>
+            <span>无报价任务登记</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/entrust/quote-reg')" index="/entrust/quote-reg">
+            <el-icon><EditPen /></el-icon>
+            <span>有报价任务登记</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/entrust/order')" index="/entrust/order">
+            <el-icon><EditPen /></el-icon>
+            <span>委托下单</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/entrust/my-info')" index="/entrust/my-info">
+            <el-icon><EditPen /></el-icon>
+            <span>我的委托单信息</span>
+          </el-menu-item>
+          <el-menu-item v-if="hasMenuPermission('/entrust/summary')" index="/entrust/summary">
+            <el-icon><EditPen /></el-icon>
+            <span>委托单汇总</span>
+          </el-menu-item>
+        </el-sub-menu>
+
         <!-- 系统管理 -->
         <el-sub-menu v-if="hasMenuPermission('/system')" index="/system">
           <template #title>
@@ -50,10 +122,6 @@
               <el-menu-item v-if="hasMenuPermission('/system/permission/org/role')" index="/system/permission/org/role">
                 <el-icon><Stamp /></el-icon>
                 <span>角色管理</span>
-              </el-menu-item>
-              <el-menu-item v-if="hasMenuPermission('/system/permission/org/position')" index="/system/permission/org/position">
-                <el-icon><Postcard /></el-icon>
-                <span>职位维护</span>
               </el-menu-item>
             </el-sub-menu>
 
@@ -142,9 +210,16 @@ import {
   Folder,
   UserFilled,
   Stamp,
-  Postcard,
   User,
-  ArrowDown
+  ArrowDown,
+  DocumentCopy,
+  List,
+  Document,
+  Tickets,
+  Collection,
+  Checked,
+  Goods,
+  EditPen
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 

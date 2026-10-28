@@ -126,15 +126,80 @@ class UserViewSet(viewsets.ModelViewSet):
         return success_response(None, message="人员删除成功")
 
 
-class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Department.objects.all().order_by('name')
+class DepartmentViewSet(viewsets.ModelViewSet):
+    queryset = Department.objects.all().select_related('parent').order_by('sort_order', 'code')
     serializer_class = DepartmentSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
+    def get_queryset(self):
+        qs = Department.objects.all().select_related('parent').order_by('sort_order', 'code')
+        code = self.request.query_params.get('code')
+        name = self.request.query_params.get('name')
+        org_type = self.request.query_params.get('org_type')
+        business_type = self.request.query_params.get('business_type')
+        is_legal_person = self.request.query_params.get('is_legal_person')
+        is_active = self.request.query_params.get('is_active')
+
+        if code:
+            qs = qs.filter(code__icontains=code.strip())
+        if name:
+            qs = qs.filter(name__icontains=name.strip())
+        if org_type:
+            qs = qs.filter(org_type=org_type)
+        if business_type:
+            qs = qs.filter(business_type=business_type)
+        if is_legal_person in ['true', 'True', '1', True]:
+            qs = qs.filter(is_legal_person=True)
+        elif is_legal_person in ['false', 'False', '0', False]:
+            qs = qs.filter(is_legal_person=False)
+        if is_active in ['true', 'True', '1', True]:
+            qs = qs.filter(is_active=True)
+        elif is_active in ['false', 'False', '0', False]:
+            qs = qs.filter(is_active=False)
+
+        return qs
+
     def list(self, request, *args, **kwargs):
+        # 如果是树状请求或者没有任何查询参数时，返回顶级树结构
+        as_tree = request.query_params.get('as_tree', 'false').lower() == 'true'
+        has_filter = any(request.query_params.get(k) for k in ['code', 'name', 'org_type', 'business_type', 'is_legal_person', 'is_active'])
+
+        if as_tree and not has_filter:
+            root_qs = Department.objects.filter(parent__isnull=True).order_by('sort_order', 'code')
+            serializer = self.get_serializer(root_qs, many=True)
+            return success_response(serializer.data)
+
+        # 否则返回平铺列表，前端亦可自动根据 parent_id 构造成树
         serializer = self.get_serializer(self.get_queryset(), many=True)
         return success_response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+        # 若未指定所属单位且有上级，自动继承或使用自身名称
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        if not instance.company_name:
+            if instance.parent and instance.parent.company_name:
+                instance.company_name = instance.parent.company_name
+            else:
+                instance.company_name = instance.name
+            instance.save(update_fields=['company_name'])
+        return success_response(self.get_serializer(instance).data, message="组织单位创建成功", code=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', request.method == 'PATCH')
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return success_response(self.get_serializer(instance).data, message="组织单位更新成功")
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return success_response(None, message="组织单位删除成功")
 
 
 class RoleViewSet(viewsets.ModelViewSet):

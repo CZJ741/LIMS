@@ -3,16 +3,71 @@ from django.contrib.auth.models import AbstractUser
 from common.models import BaseModel
 
 class Department(BaseModel):
-    name = models.CharField(max_length=64, unique=True, verbose_name="部门名称")
-    code = models.CharField(max_length=32, unique=True, verbose_name="部门编码")
-    description = models.TextField(blank=True, null=True, verbose_name="部门职责")
+    ORG_TYPE_CHOICES = (
+        ('COMPANY', '单位'),
+        ('BRANCH', '分支机构'),
+        ('DEPT', '部门'),
+        ('LAB', '检测实验室'),
+        ('TEAM', '采样/业务组'),
+    )
+    BUSINESS_TYPE_CHOICES = (
+        ('ENV', '环境检测'),
+        ('OCCUPATIONAL', '职业卫生'),
+        ('PUBLIC_HEALTH', '公共卫生'),
+        ('COMPREHENSIVE', '综合业务'),
+        ('OTHER', '其他'),
+    )
+
+    name = models.CharField(max_length=64, verbose_name="单位/部门名称")
+    code = models.CharField(max_length=32, unique=True, verbose_name="单位编码")
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='children',
+        verbose_name="上级单位"
+    )
+    org_type = models.CharField(
+        max_length=20,
+        choices=ORG_TYPE_CHOICES,
+        default='COMPANY',
+        verbose_name="单位类型"
+    )
+    business_type = models.CharField(
+        max_length=20,
+        choices=BUSINESS_TYPE_CHOICES,
+        default='ENV',
+        verbose_name="业务类型"
+    )
+    is_legal_person = models.BooleanField(default=False, verbose_name="是否独立法人")
+    company_name = models.CharField(max_length=128, blank=True, null=True, verbose_name="所属单位名称")
+    sort_order = models.IntegerField(default=0, verbose_name="排序号")
+    is_active = models.BooleanField(default=True, verbose_name="是否有效")
+    description = models.TextField(blank=True, null=True, verbose_name="职责描述")
 
     class Meta:
         verbose_name = "组织部门"
         verbose_name_plural = verbose_name
+        ordering = ['sort_order', 'code']
+
+    def delete(self, *args, **kwargs):
+        # 1. 核心管理员部门保护
+        if self.code == 'ADMIN_DEPT':
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied("系统总控核心部门受最高保护，严禁删除！")
+        # 2. 检查下级子单位关联
+        if self.children.exists():
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied(f"单位【{self.name}】下存在子级组织/部门，请先调整或清理下级单位后方可操作！")
+        # 3. 检查人员关联
+        if hasattr(self, 'users') and self.users.exists():
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied(f"单位【{self.name}】下存在在职人员，为保证审计追溯闭环，严禁直接删除！")
+        return super().delete(*args, **kwargs)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.code})"
 
 class Role(BaseModel):
     name = models.CharField(max_length=64, unique=True, verbose_name="职位/角色名称")
